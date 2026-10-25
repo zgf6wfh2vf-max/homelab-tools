@@ -162,7 +162,8 @@ class Ledger:
         The charge is looked up at the day's *first slot with data* rather than at local midnight:
         when the fetch window starts at UTC midnight during British Summer Time, local midnight
         (23:00 UTC the day before) lies outside the loaded rates and the day would get no charge.
-        The metric sample is still timestamped at local midnight.
+        The metric sample is timestamped at local *noon*, for the same reason: a midnight stamp
+        falls on the previous UTC day in summer, so daily charts counted it on the wrong day.
         """
         first: dict[date, datetime] = {}
         for moment, _ in slots:
@@ -173,8 +174,8 @@ class Ledger:
             pence = rates.at(moment)
             if pence is not None:
                 self.days[day].standing_p[fuel] = pence
-                midnight = moment.astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
-                self._point("standing_p", midnight, pence, {"fuel": fuel})
+                noon = moment.astimezone().replace(hour=12, minute=0, second=0, microsecond=0)
+                self._point("standing_p", noon, pence, {"fuel": fuel})
 
     def add_house_use(self, house_kwh: dict[datetime, float], import_rates: RateTable) -> None:
         """Record what the house's own use would have cost on the import tariff, slot by slot."""

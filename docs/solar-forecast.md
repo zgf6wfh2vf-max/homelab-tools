@@ -26,7 +26,7 @@ actual generation on a few clear days; adjust kWp if it is consistently high or 
 `tomorrow_peak`, `updated`.
 
 **Metrics:** `forecast_solar_w` (expected power through the day) and `forecast_solar_day_kwh`
-(the day's expected total, at local midnight).
+(the day's expected total, at local noon - a midnight stamp can fall on the previous UTC day in summer).
 
 ## Why the curve is stored once a day
 

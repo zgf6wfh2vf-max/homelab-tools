@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3
+
+* Daily values (`forecast_solar_day_kwh`, `octopus_standing_p`) are stamped at local noon instead of
+  midnight: in summer, local midnight is 23:00 UTC the previous day, so daily charts showed them on
+  the wrong day (e.g. Sunday's forecast in Saturday's bar).
+
 ## 0.2.2
 
 * `weekly-report`: the dashboard change fields also skip incomplete weeks.

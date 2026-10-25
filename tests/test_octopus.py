@@ -135,7 +135,7 @@ def test_export_gas_standing_and_net() -> None:
     assert day.electricity_p == pytest.approx(day.import_cost_p + 50)
     assert day.gas_p == pytest.approx(336 + 29)
     assert day.net_p == pytest.approx(day.electricity_p + day.gas_p - 15)
-    assert ("standing_p", T0, 50.0, {"fuel": "electricity"}) in ledger.points
+    assert ("standing_p", T0.replace(hour=12), 50.0, {"fuel": "electricity"}) in ledger.points
 
 
 def test_saving_needs_house_data() -> None:

@@ -21,7 +21,7 @@ Settings (environment):
 ``FORECAST_SOLAR_API_KEY``   Optional paid-plan key (higher limits, more planes).
 
 Metrics: ``forecast_solar_w`` (expected power, hourly points for today) and ``forecast_solar_day_kwh``
-(expected total, one sample at local midnight per day).
+(expected total, one sample at local noon per day).
 """
 
 from __future__ import annotations
@@ -139,15 +139,17 @@ def status(forecast: Forecast, today: date, actual_kwh: float | None) -> dict[st
 
 
 def curve_samples(forecast: Forecast, day: date) -> list[Sample]:
-    """Metric samples for ``day``: the hourly power curve plus the day's total at local midnight."""
+    """Metric samples for ``day``: the hourly power curve plus the day's total at local noon."""
     samples = [
         Sample("forecast_solar", {"w": w}, time=t)
         for t, w in sorted(forecast.watts.items())
         if t.astimezone().date() == day
     ]
     if day in forecast.day_wh:
-        midnight = datetime.combine(day, datetime.min.time()).astimezone()
-        samples.append(Sample("forecast_solar", {"day_kwh": forecast.day_wh[day] / 1000}, time=midnight))
+        # Daily values are stamped at local noon: local midnight can fall on the previous UTC day
+        # (23:00 UTC in summer), which put the total in the wrong day's bar in Grafana.
+        noon = datetime.combine(day, datetime.min.time()).replace(hour=12).astimezone()
+        samples.append(Sample("forecast_solar", {"day_kwh": forecast.day_wh[day] / 1000}, time=noon))
     return samples
 
 

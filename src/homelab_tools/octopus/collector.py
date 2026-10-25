@@ -17,7 +17,8 @@ Settings (environment):
 Metrics (pence include VAT; one sample per half-hour, timestamped at the slot start):
 ``octopus_import_kwh``, ``_import_rate_p``, ``_import_cost_p``, ``_import_offpeak_kwh``,
 ``_import_peak_kwh``, ``_export_kwh``, ``_export_rate_p``, ``_export_earn_p``, ``_gas_m3``,
-``_gas_kwh``, ``_gas_cost_p``, ``_nosolar_cost_p``, and ``octopus_standing_p{fuel=...}`` once a day.
+``_gas_kwh``, ``_gas_cost_p``, ``_nosolar_cost_p``, and ``octopus_standing_p{fuel=...}`` once a day
+(timestamped at local noon, so it always lands on the right day in daily charts).
 """
 
 from __future__ import annotations

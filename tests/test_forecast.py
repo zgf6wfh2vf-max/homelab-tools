@@ -67,6 +67,7 @@ def test_status_and_curve(utc_zone) -> None:
     assert sum(1 for s in samples if "w" in s.fields) == 11  # only today's points
     (total,) = [s for s in samples if "day_kwh" in s.fields]
     assert total.fields["day_kwh"] == pytest.approx(15.299)
+    assert total.time is not None and total.time.hour == 12
     assert status(f, date(2026, 12, 1), None)["today_kwh"] == "-"
 
 
@@ -110,3 +111,23 @@ def utc_zone(monkeypatch):
     yield
     monkeypatch.undo()
     time.tzset()
+
+
+def test_daily_total_lands_on_its_own_utc_day_in_summer() -> None:
+    """Regression: a local-midnight stamp in BST is 23:00 UTC the day before."""
+    import os
+    import time
+
+    old = os.environ.get("TZ")
+    os.environ["TZ"] = "Europe/London"
+    time.tzset()
+    try:
+        f = combine([response("2026-10-25")])  # the last day of BST
+        (total,) = [s for s in curve_samples(f, date(2026, 10, 25)) if "day_kwh" in s.fields]
+        assert total.time is not None and total.time.astimezone(UTC).date() == date(2026, 10, 25)
+    finally:
+        if old is None:
+            del os.environ["TZ"]
+        else:
+            os.environ["TZ"] = old
+        time.tzset()

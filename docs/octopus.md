@@ -51,7 +51,7 @@ as Octopus Go or Agile, tariff switches mid-month, and daily standing charges.
 **Metrics** (`octopus_*`, one sample per half-hour at the slot start): `import_kwh`,
 `import_rate_p`, `import_cost_p`, `import_offpeak_kwh`, `import_peak_kwh`, `export_kwh`,
 `export_rate_p`, `export_earn_p`, `gas_m3`, `gas_kwh`, `gas_cost_p`, `nosolar_cost_p`, and
-`standing_p{fuel="electricity|gas"}` once a day.
+`standing_p{fuel="electricity|gas"}` once a day, at local noon.
 
 **Status** (`octopus.json`, newest complete day): `day`, `import_kwh`, `import_cost`, `export_kwh`,
 `export_earn`, `gas_kwh`, `gas_cost`, `net`, `saved`, `month_net`, `month_days`, `updated`.

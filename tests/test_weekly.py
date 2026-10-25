@@ -113,6 +113,8 @@ def test_part_weeks_are_not_compared() -> None:
     assert "than the week before" not in message
     one_day = WeekFigures(date(2026, 10, 19), solar_kwh=17.0, solar_days=1)
     assert "Solar 17 kWh (1 day recorded)." in format_report(one_day, None)[1]
+    d = display(part, full)
+    assert d["net_change"] == d["gas_change"] == "-"  # cost comparisons need complete weeks
     empty = WeekFigures(date(2026, 10, 26))
     assert format_report(empty, None) == ("Week 26 Oct-1 Nov", "No data was recorded this week.")
 

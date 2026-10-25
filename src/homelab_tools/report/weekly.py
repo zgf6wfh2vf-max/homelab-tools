@@ -258,6 +258,8 @@ def display(w: WeekFigures, prev: WeekFigures | None) -> dict[str, str]:
         return f"{'▲' if diff > 0 else '▼'} {text}" if abs(diff) >= (1 if pence else 0.5) else "same"
 
     p = prev
+    # money and gas come from Octopus: only compare when both weeks have every day's data
+    octopus_comparable = p is not None and w.octopus_days == 7 and p.octopus_days == 7
     return {
         "week": w.label,
         "net": money(w.net_p),
@@ -268,10 +270,10 @@ def display(w: WeekFigures, prev: WeekFigures | None) -> dict[str, str]:
         "car": kwh(w.car_kwh) if w.car_sessions else "0 kWh",
         "offpeak": f"{w.offpeak_share * 100:.0f}%" if w.offpeak_share is not None else "-",
         "gas_kwh": kwh(w.gas_kwh),
-        "net_change": delta(w.net_p, p.net_p if p else None, pence=True),
+        "net_change": delta(w.net_p, p.net_p if p and octopus_comparable else None, pence=True),
         "solar_change": delta(w.solar_kwh, p.solar_kwh if p else None),
         "car_change": delta(w.car_kwh, p.car_kwh if p else None),
-        "gas_change": delta(w.gas_kwh, p.gas_kwh if p else None),
+        "gas_change": delta(w.gas_kwh, p.gas_kwh if p and octopus_comparable else None),
     }
 
 

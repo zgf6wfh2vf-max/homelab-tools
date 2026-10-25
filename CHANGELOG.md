@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+* `weekly-report`: the dashboard change fields also skip incomplete weeks.
+
 ## 0.2.1
 
 * `weekly-report`: only compare with the previous week when both weeks have complete cost data;

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+* `podpoint-monitor`: reuse one Pod Point sign-in (also across restarts) instead of creating a new
+  session at every hourly token refresh, which made Pod Point send a "new sign-in" email each time.
+
 ## 0.1.0 - initial release
 
 * `octopus-collector` / `octopus-setup`: half-hourly Octopus Energy usage priced at the exact tariff

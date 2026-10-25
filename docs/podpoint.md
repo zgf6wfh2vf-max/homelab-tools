@@ -33,6 +33,14 @@ printf '%s\n%s\n' 'you@example.com' 'app-password' \
 
 On the first run the whole charging history is written to VictoriaMetrics (nothing is announced).
 
+## Sign-in emails
+
+Left alone, `podpointclient` creates a new Pod Point session - a fresh sign-in with your password -
+every time it renews its one-hour access token, and Pod Point emails you about each one (~24 a
+day). The monitor prevents that: it keeps the first session and the refresh token in
+`PODPOINT_LOGIN_FILE` (mode 600) and reuses them, including across restarts. You get one sign-in
+email when the file is first created, and another only if Pod Point rejects the saved sign-in.
+
 ## Settings
 
 | Setting | Default | Meaning |
@@ -40,6 +48,7 @@ On the first run the whole charging history is written to VictoriaMetrics (nothi
 | `PODPOINT_CREDENTIALS_FILE` | required | Email on line 1, password on line 2 |
 | `PODPOINT_STATE_FILE` | `/var/lib/podpoint-monitor/state.json` | Last session id seen |
 | `PODPOINT_INTERVAL` | 180 | Seconds between polls |
+| `PODPOINT_LOGIN_FILE` | `login.json` next to the state file | Saved sign-in (refresh token, user id) |
 
 ## Outputs
 

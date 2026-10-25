@@ -11,4 +11,4 @@ All settings come from environment variables, so the same code runs anywhere and
 lives in the source. See ``README.md`` and ``docs/`` for each tool.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

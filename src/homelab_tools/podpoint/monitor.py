@@ -10,6 +10,8 @@ Settings (environment):
 
 ``PODPOINT_CREDENTIALS_FILE``  File with the app login: email on line 1, password on line 2 (mode 600).
 ``PODPOINT_STATE_FILE``        Last seen session id (default /var/lib/podpoint-monitor/state.json).
+``PODPOINT_LOGIN_FILE``        Saved sign-in, so Pod Point does not email you about a new sign-in every
+                               hour (default ``login.json`` next to the state file); see :mod:`.login`.
 ``PODPOINT_INTERVAL``          Seconds between polls, default 180.
 
 Outputs: ``ev_charging/plugged/online`` metrics each poll, ``ev_session_kwh/_cost_p/_charging_s``
@@ -30,6 +32,7 @@ from homelab_tools.common.config import Outputs, env_int, env_str
 from homelab_tools.common.metrics import Sample, VictoriaMetrics
 from homelab_tools.common.notify import Notifier
 from homelab_tools.common.status import write_status
+from homelab_tools.podpoint.login import LoginCache, cached_session_class, remember, restore
 from homelab_tools.podpoint.model import (
     Charge,
     ChargerState,
@@ -96,6 +99,7 @@ def session_sample(c: Charge) -> Sample:
 async def run() -> None:
     """Log in once and poll forever (the library refreshes its token itself)."""
     import aiohttp
+    import podpointclient.helpers.auth as pp_auth
     from podpointclient.client import PodPointClient  # imported inside the event loop on purpose:
     # the library creates an aiohttp session at import time, which needs a running loop.
 
@@ -103,6 +107,8 @@ async def run() -> None:
     email, password = Path(env_str("PODPOINT_CREDENTIALS_FILE")).read_text().splitlines()[:2]
     state_file = Path(env_str("PODPOINT_STATE_FILE", "/var/lib/podpoint-monitor/state.json"))
     interval = env_int("PODPOINT_INTERVAL", 180)
+    login = LoginCache.load(Path(env_str("PODPOINT_LOGIN_FILE", str(state_file.with_name("login.json")))))
+    pp_auth.Session = cached_session_class(pp_auth.Session, login)  # one sign-in, not one per hour
     notifier, vm = Notifier(outputs.ntfy_url), VictoriaMetrics(outputs.vm_url)
     try:
         saved: dict[str, Any] = json.loads(state_file.read_text())
@@ -113,6 +119,8 @@ async def run() -> None:
 
     async with aiohttp.ClientSession() as session:
         client = PodPointClient(username=email.strip(), password=password.strip(), session=session)
+        if restore(client.auth, login):
+            log.info("reusing saved Pod Point sign-in")
         if last_id is None:  # first run: backfill all history, announce nothing
             page, history = 1, []
             while batch := await client.async_get_charges(perpage=50, page=page):
@@ -164,8 +172,15 @@ async def run() -> None:
                 )
                 state_file.parent.mkdir(parents=True, exist_ok=True)
                 state_file.write_text(json.dumps({"last_charge_id": last_id, "state": previous_state}))
+                remember(client.auth, login)
             except Exception as exc:  # noqa: BLE001 - the unofficial API can fail in many ways; retry next round
                 log.warning("poll failed: %r", exc)
+                if type(exc).__name__ in ("AuthError", "SessionError"):  # saved sign-in rejected
+                    log.warning("discarding the saved sign-in; the next poll signs in again")
+                    login.clear()
+                    client.auth.access_token = client.auth.access_token_expiry = client.auth.refresh_token = (
+                        None
+                    )
             await asyncio.sleep(interval)
 
 

@@ -1,0 +1,74 @@
+# Example Homepage services using the homelab-tools status files. Each "field" is a key of the
+# tool's JSON file (see the tool's page under docs/ for the full list).
+- Energy:
+    - Solar:
+        icon: mdi-solar-power-variant
+        description: Solis hybrid inverter
+        widget:
+          type: customapi
+          url: http://status:8080/solis.json
+          refreshInterval: 30000
+          mappings:
+            - { field: pv_w, label: Now }
+            - { field: pv_today, label: Today }
+            - { field: batt_soc, label: Battery }
+            - { field: grid_dir, label: Grid }
+    - Latest day:
+        icon: mdi-receipt-text-outline
+        description: Octopus data runs 1-2 days behind
+        widget:
+          type: customapi
+          url: http://status:8080/octopus.json
+          refreshInterval: 600000
+          mappings:
+            - { field: day, label: Day }
+            - { field: net, label: Net }
+            - { field: import_cost, label: Electric }
+            - { field: gas_cost, label: Gas }
+    - Car charger:
+        icon: mdi-ev-station
+        description: Pod Point
+        widget:
+          type: customapi
+          url: http://status:8080/ev.json
+          refreshInterval: 60000
+          mappings:
+            - { field: state, label: Now }
+            - { field: last_kwh, label: Last charge }
+            - { field: month_cost, label: This month }
+
+- Home:
+    - Downstairs:
+        icon: mdi-sofa-outline
+        description: tado zone
+        widget:
+          type: customapi
+          url: http://status:8080/tado.json
+          refreshInterval: 120000
+          mappings:
+            - { field: downstairs_temp, label: Now }
+            - { field: downstairs_target, label: Target }
+            - { field: downstairs_heat, label: Heating }
+    - 3D printer:
+        icon: mdi-printer-3d-nozzle
+        description: FlashForge AD5X · off when not in use
+        widget:
+          type: customapi
+          url: http://status:8080/printer.json
+          refreshInterval: 30000
+          mappings:
+            - { field: state, label: State }
+            - { field: progress, label: Progress }
+            - { field: eta, label: Done at }
+
+- Charts:
+    - Power today:
+        icon: mdi-chart-areaspline
+        description: From the example "embed" Grafana dashboard
+        widget:
+          type: iframe
+          name: power
+          # Loaded by the viewer's browser: use an address the browser can reach. Grafana needs
+          # GF_SECURITY_ALLOW_EMBEDDING=true and anonymous viewing (or a logged-in session).
+          src: "https://grafana.example.lan/d-solo/embed/homepage-embeds?orgId=1&panelId=1&from=now-24h&to=now&theme=dark&refresh=1m&hideLogo=true"
+          classes: h-60 sm:h-60 md:h-60 lg:h-60 xl:h-60 2xl:h-72

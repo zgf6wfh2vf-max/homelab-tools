@@ -1,0 +1,14 @@
+#!/bin/sh
+# keepalived notify script: alert when DNS fails over. Arguments: TYPE NAME STATE.
+# Set NTFY_URL and PRIMARY_HOST (the primary's hostname) in /etc/default/keepalived-notify.
+# shellcheck disable=SC1091
+[ -r /etc/default/keepalived-notify ] && . /etc/default/keepalived-notify
+[ -n "${NTFY_URL:-}" ] || exit 0
+host=$(hostname)
+case "$3" in
+  MASTER) [ "$host" = "${PRIMARY_HOST:-}" ] && exit 0   # the primary taking its address back is normal
+          msg="$host now holds the shared DNS address - the primary Pi-hole is not answering." ;;
+  FAULT)  msg="$host's Pi-hole failed its health check and gave up the shared DNS address." ;;
+  *)      exit 0 ;;
+esac
+curl -fsS -m 15 -H "Title: DNS failover" -H "Priority: high" -H "Tags: warning" -d "$msg" "$NTFY_URL" >/dev/null || true

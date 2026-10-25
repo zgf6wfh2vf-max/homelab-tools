@@ -1,0 +1,103 @@
+#!/bin/bash
+# sqlite-snapshot-backup - daily, space-efficient snapshots of a directory tree with consistent SQLite copies.
+#
+# Designed for a directory of Docker Compose stacks (/opt/stacks/<app>/...) where many apps keep their
+# state in SQLite databases that are being written to while the backup runs.
+#
+# How it works
+#   * Each run creates <DEST>/<YYYY-MM-DD>. Files unchanged since the previous snapshot are hard links
+#     to it (rsync --link-dest), so every snapshot looks complete but only changed files use space.
+#   * Copying a live SQLite file can produce a corrupt backup. Files named *.db / *.sqlite are therefore
+#     excluded from rsync and copied with SQLite's own "VACUUM INTO", which writes a consistent copy
+#     while the database is in use, then verified with "PRAGMA quick_check".
+#   * Some apps use .db for non-SQLite formats (e.g. BoltDB); those are recognised by their header and
+#     copied as ordinary files.
+#   * The snapshot is built as <date>.partial and renamed only when complete; the oldest snapshots
+#     beyond SNAPSHOT_KEEP are deleted.
+#   * On failure an ntfy alert is sent; on success an optional "heartbeat" URL is called (e.g. an Uptime
+#     Kuma push monitor), so a backup that silently stops running is noticed too.
+#
+# Settings (environment; e.g. EnvironmentFile=/etc/default/sqlite-snapshot-backup)
+#   SNAPSHOT_SOURCE  directory to back up (required)
+#   SNAPSHOT_EXTRA   optional second directory, stored as <snapshot>/_extra (e.g. app data on another disk)
+#   SNAPSHOT_DEST    where snapshots go (required; ideally another disk)
+#   SNAPSHOT_KEEP    number of daily snapshots to keep (default 14)
+#   NTFY_URL         ntfy topic URL for failure alerts (optional)
+#   HEARTBEAT_URL    URL to GET after a successful run (optional); "status", "msg" and "ping" are appended
+#
+# Restore: snapshots are plain directories - copy back what you need (stop the app first for databases).
+
+set -euo pipefail
+
+: "${SNAPSHOT_SOURCE:?set SNAPSHOT_SOURCE to the directory to back up}"
+: "${SNAPSHOT_DEST:?set SNAPSHOT_DEST to the backup directory}"
+SNAPSHOT_EXTRA=${SNAPSHOT_EXTRA:-}
+SNAPSHOT_KEEP=${SNAPSHOT_KEEP:-14}
+NTFY_URL=${NTFY_URL:-}
+HEARTBEAT_URL=${HEARTBEAT_URL:-}
+
+# fail MESSAGE - send an alert (best effort) and exit non-zero.
+fail() {
+  if [ -n "$NTFY_URL" ]; then
+    curl -fsS -m 20 -H "Title: Backup FAILED" -H "Priority: high" -H "Tags: warning" \
+      -d "$1" "$NTFY_URL" >/dev/null || true
+  fi
+  echo "FAILED: $1" >&2
+  exit 1
+}
+trap 'fail "sqlite-snapshot-backup failed at line $LINENO (see its log)"' ERR
+
+[ -d "$SNAPSHOT_SOURCE" ] || fail "source $SNAPSHOT_SOURCE does not exist"
+mkdir -p "$SNAPSHOT_DEST"
+[ -w "$SNAPSHOT_DEST" ] || fail "destination $SNAPSHOT_DEST is not writable (is the backup disk mounted?)"
+
+today=$(date +%F)
+snap="$SNAPSHOT_DEST/$today"
+previous=$(find "$SNAPSHOT_DEST" -mindepth 1 -maxdepth 1 -type d -name '20*' ! -name '*.partial' \
+  ! -name "$today" | sort | tail -1)
+rm -rf "$snap.partial"
+
+# copy_tree SOURCE TARGET [PREVIOUS] - hard-link snapshot of everything except databases.
+copy_tree() {
+  rsync -aHAX --numeric-ids \
+    --exclude='*.db' --exclude='*.sqlite' --exclude='*-wal' --exclude='*-shm' --exclude='*-journal' \
+    ${3:+--link-dest="$3"} "$1/" "$2/"
+}
+
+# copy_databases SOURCE TARGET - consistent copies of every *.db / *.sqlite under SOURCE.
+copy_databases() {
+  local source=$1 target=$2 db out
+  while IFS= read -r -d '' db; do
+    out="$target/${db#"$source"/}"
+    mkdir -p "$(dirname "$out")"
+    if [ "$(head -c 15 "$db" | tr -d '\0')" != "SQLite format 3" ]; then
+      cp -a "$db" "$out"  # not SQLite (e.g. BoltDB): plain copy
+      continue
+    fi
+    sqlite3 "$db" "VACUUM INTO '${out//\'/\'\'}'"
+    [ "$(sqlite3 "$out" 'PRAGMA quick_check;')" = ok ] || fail "backup of $db failed its integrity check"
+  done < <(find "$source" -type f \( -name '*.db' -o -name '*.sqlite' \) -size +0 -print0)
+}
+
+copy_tree "$SNAPSHOT_SOURCE" "$snap.partial" "$previous"
+copy_databases "$SNAPSHOT_SOURCE" "$snap.partial"
+if [ -n "$SNAPSHOT_EXTRA" ]; then
+  [ -d "$SNAPSHOT_EXTRA" ] || fail "extra directory $SNAPSHOT_EXTRA does not exist"
+  mkdir -p "$snap.partial/_extra"
+  copy_tree "$SNAPSHOT_EXTRA" "$snap.partial/_extra" "${previous:+$previous/_extra}"
+  copy_databases "$SNAPSHOT_EXTRA" "$snap.partial/_extra"
+fi
+
+rm -rf "$snap"
+mv "$snap.partial" "$snap"
+
+# Keep the newest SNAPSHOT_KEEP snapshots.
+find "$SNAPSHOT_DEST" -mindepth 1 -maxdepth 1 -type d -name '20*' ! -name '*.partial' | sort \
+  | head -n -"$SNAPSHOT_KEEP" | xargs -r rm -rf
+
+size=$(du -sh "$snap" | cut -f1)
+if [ -n "$HEARTBEAT_URL" ]; then
+  curl -fsS -m 20 -G "$HEARTBEAT_URL" --data-urlencode "status=up" --data-urlencode "msg=OK $today $size" \
+    --data-urlencode "ping=$((SECONDS * 1000))" >/dev/null || echo "warning: heartbeat failed" >&2
+fi
+echo "OK: $snap ($size, ${SECONDS}s)"

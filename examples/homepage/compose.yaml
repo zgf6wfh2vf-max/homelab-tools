@@ -1,0 +1,23 @@
+# Homepage (https://gethomepage.dev) plus a tiny read-only web server that publishes the tools'
+# status JSON files to Homepage's "customapi" widgets. Nothing is exposed outside Docker except
+# Homepage itself.
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: home.example.lan,192.168.1.2:3000
+    volumes:
+      - ./config:/app/config
+
+  # Serves /var/lib/homelab-status/*.json at http://status:8080/<name>.json inside this network.
+  status:
+    image: busybox:stable
+    restart: unless-stopped
+    read_only: true
+    user: "65534:65534"
+    command: httpd -f -p 8080 -h /www
+    volumes:
+      - /var/lib/homelab-status:/www:ro

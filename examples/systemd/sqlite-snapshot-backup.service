@@ -1,0 +1,12 @@
+# sqlite-snapshot-backup.service - nightly snapshot of a directory with consistent SQLite copies
+# Runs as root so it can read every app's files; settings in /etc/default/sqlite-snapshot-backup.
+[Unit]
+Description=Snapshot backup with consistent SQLite copies
+RequiresMountsFor=/mnt/backup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sqlite-snapshot-backup
+EnvironmentFile=/etc/default/sqlite-snapshot-backup
+Nice=10
+IOSchedulingClass=idle

@@ -1,0 +1,6 @@
+#!/bin/sh
+# keepalived health check: does the local Pi-hole answer?
+# Resolve a *local* DNS record (set one up in Pi-hole), so an internet outage does not make both
+# Pi-holes look unhealthy and move the address back and forth.
+CHECK_NAME=${CHECK_NAME:-pi.hole}
+dig @127.0.0.1 +short +time=2 +tries=1 "$CHECK_NAME" | grep -q '^[0-9]'

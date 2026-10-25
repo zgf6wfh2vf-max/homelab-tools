@@ -1,0 +1,7 @@
+/* Equal-size Homepage cards: every card fills its grid cell, all cards share one minimum height,
+   and widget values stay on one line so rows of blocks line up. */
+li.service { display: flex; }
+li.service > .service-card { flex: 1; display: flex; flex-direction: column; min-height: 8.25rem; }
+li.service > .service-card > :last-child { margin-top: auto; }
+.service-block { min-height: 3.4rem; }
+.service-block > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }

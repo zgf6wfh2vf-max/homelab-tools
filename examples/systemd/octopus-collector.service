@@ -1,0 +1,19 @@
+# octopus-collector.service - Octopus Energy usage and cost collector
+# Install: see docs/installation.md. Settings live in /etc/homelab-tools/octopus-collector.env.
+[Unit]
+Description=Octopus Energy usage and cost collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/homelab-tools/bin/octopus-collector
+EnvironmentFile=/etc/homelab-tools/octopus-collector.env
+User=homelab
+Group=homelab
+StateDirectory=octopus-collector
+ReadWritePaths=/var/lib/homelab-status
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes

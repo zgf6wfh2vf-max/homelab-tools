@@ -1,0 +1,24 @@
+# ad5x-monitor.service - FlashForge AD5X printer monitor (read-only)
+# Install: see docs/installation.md. Settings live in /etc/homelab-tools/ad5x-monitor.env.
+[Unit]
+Description=FlashForge AD5X printer monitor (read-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/homelab-tools/bin/ad5x-monitor
+EnvironmentFile=/etc/homelab-tools/ad5x-monitor.env
+Restart=always
+RestartSec=60
+User=homelab
+Group=homelab
+StateDirectory=ad5x-monitor
+ReadWritePaths=/var/lib/homelab-status
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

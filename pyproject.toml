@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "homelab-tools"
+version = "0.1.0"
+description = "Small, read-only monitors for a home lab: Octopus Energy costs, Solis inverters, FlashForge AD5X, tado, Pod Point, Pi-hole threat alerts and OpenCanary - feeding ntfy, VictoriaMetrics and dashboards."
+readme = "README.md"
+authors = [{ name = "Rich Spokes" }]
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = []          # every tool except podpoint-monitor uses the standard library only
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Home Automation",
+    "Topic :: System :: Monitoring",
+]
+
+[project.optional-dependencies]
+podpoint = ["podpointclient>=1.6", "aiohttp>=3.9", "async_timeout>=4"]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6", "mypy>=1.10"]
+
+[project.scripts]
+solis-monitor = "homelab_tools.solis.monitor:main"
+octopus-collector = "homelab_tools.octopus.collector:main"
+octopus-setup = "homelab_tools.octopus.setup:main"
+ad5x-monitor = "homelab_tools.ad5x.monitor:main"
+tado-auth = "homelab_tools.tado.auth:main"
+tado-monitor = "homelab_tools.tado.monitor:main"
+podpoint-monitor = "homelab_tools.podpoint.monitor:main"
+pihole-threat-alert = "homelab_tools.pihole_threats.alert:main"
+opencanary-ntfy = "homelab_tools.opencanary_ntfy.relay:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, isort, bugbear, pyupgrade, simplify, docstrings, naming, return checks
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "D", "N", "RET", "PTH"]
+ignore = [
+    "PTH123",  # plain open() is fine for small files
+    "SIM108",  # an if/else block often reads better than a nested ternary
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D"]                      # test names say what they test
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+mypy_path = "src"
+packages = ["homelab_tools"]
+
+[[tool.mypy.overrides]]
+module = ["podpointclient.*", "aiohttp.*"]
+ignore_missing_imports = true

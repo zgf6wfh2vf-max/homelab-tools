@@ -1,0 +1,24 @@
+# podpoint-monitor.service - Pod Point charger monitor (read-only, unofficial API)
+# Install: see docs/installation.md. Settings live in /etc/homelab-tools/podpoint-monitor.env.
+[Unit]
+Description=Pod Point charger monitor (read-only, unofficial API)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/homelab-tools/bin/podpoint-monitor
+EnvironmentFile=/etc/homelab-tools/podpoint-monitor.env
+Restart=always
+RestartSec=60
+User=homelab
+Group=homelab
+StateDirectory=podpoint-monitor
+ReadWritePaths=/var/lib/homelab-status
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

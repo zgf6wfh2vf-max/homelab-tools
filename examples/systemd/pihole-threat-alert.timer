@@ -1,0 +1,10 @@
+# pihole-threat-alert.timer - Check for threat-list lookups every 5 minutes
+[Unit]
+Description=Check for threat-list lookups every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

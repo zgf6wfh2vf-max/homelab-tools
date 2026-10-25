@@ -1,0 +1,11 @@
+# octopus-collector.timer - Fetch Octopus data every 3 hours
+[Unit]
+Description=Fetch Octopus data every 3 hours
+
+[Timer]
+OnBootSec=5min
+OnCalendar=*-*-* 00/3:20
+Persistent=true
+
+[Install]
+WantedBy=timers.target

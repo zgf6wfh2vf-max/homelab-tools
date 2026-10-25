@@ -12,7 +12,7 @@
   "to": "now"
  },
  "schemaVersion": 39,
- "version": 5,
+ "version": 6,
  "timepicker": {
   "refresh_intervals": [
    "30s",
@@ -806,8 +806,16 @@
         "id": "color",
         "value": {
          "mode": "fixed",
-         "fixedColor": "#FADE2A80"
+         "fixedColor": "#F2CC0C"
         }
+       },
+       {
+        "id": "custom.fillOpacity",
+        "value": 25
+       },
+       {
+        "id": "custom.lineWidth",
+        "value": 2
        }
       ]
      }

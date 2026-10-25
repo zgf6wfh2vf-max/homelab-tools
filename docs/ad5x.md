@@ -13,7 +13,7 @@ slicers and the touch screen keep working mid-print.
 | Job finishes | "Print finished", with duration when the start was seen |
 | Job paused (e.g. filament runout) | "Print paused" (high priority) |
 | Job stops early | "Print stopped" |
-| Printer disappears **mid-print** | "Printer went offline mid-print" (high priority) - power cut, tripped plug |
+| Printer disappears **mid-print** (3 failed polls in a row) | "Printer went offline mid-print" (high priority) - power cut, tripped plug |
 
 The finish estimate extrapolates from progress: with a known start, `elapsed / progress − elapsed`;
 when the monitor joins a print already running, from the rate of progress since joining. Progress is

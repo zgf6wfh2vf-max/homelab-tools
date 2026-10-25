@@ -24,6 +24,10 @@ from homelab_tools.ad5x.protocol import PrinterStatus
 from homelab_tools.common.timefmt import duration, when
 
 HISTORY_DAYS = 30
+#: Consecutive failed polls before a running job counts as lost. The printer accepts one control
+#: connection at a time, so a single poll can be refused while the touch screen, a slicer or the
+#: printer's own cloud client is talking to it - about 1 poll in 15 during a print.
+OFFLINE_AFTER = 3
 LABELS = {"off": "Off", "idle": "Idle", "printing": "Printing", "paused": "Paused", "done": "Finished"}
 
 
@@ -91,6 +95,7 @@ class JobTracker:
     state: str = "off"
     job: Job | None = None
     history: list[HistoryEntry] = field(default_factory=list)
+    misses: int = 0  # consecutive unreachable polls while a job was running
 
     # --- persistence ---------------------------------------------------------------------------
 
@@ -100,6 +105,7 @@ class JobTracker:
             "state": self.state,
             "job": asdict(self.job) if self.job else None,
             "history": [asdict(h) for h in self.history],
+            "misses": self.misses,
         }
 
     @classmethod
@@ -110,6 +116,7 @@ class JobTracker:
             state=data.get("state", "off"),
             job=Job(**job) if job else None,
             history=[HistoryEntry(**h) for h in data.get("history", [])],
+            misses=int(data.get("misses", 0)),
         )
 
     # --- transitions -----------------------------------------------------------------------------
@@ -117,6 +124,12 @@ class JobTracker:
     def step(self, status: PrinterStatus | None, now: float) -> list[Event]:
         """Advance with one poll result and return the notifications it causes."""
         events: list[Event] = []
+        if status is None and self.job is not None and self.state in ("printing", "paused"):
+            self.misses += 1
+            if self.misses < OFFLINE_AFTER:
+                return events  # probably just a refused connection: keep the job, decide next poll
+        else:
+            self.misses = 0
         state = "off" if status is None else status.state
         previous = self.state
 

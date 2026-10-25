@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4
+
+* `ad5x-monitor`: only report "offline mid-print" after 3 failed polls in a row. The printer refuses
+  about one poll in 15 while printing (one control connection at a time), which caused false
+  alerts and restarted the job tracking.
+
 ## 0.2.3
 
 * Daily values (`forecast_solar_day_kwh`, `octopus_standing_p`) are stamped at local noon instead of

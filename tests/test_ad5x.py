@@ -118,10 +118,22 @@ def test_offline_mid_print_is_alerted_but_offline_when_idle_is_not() -> None:
     t = JobTracker()
     t.step(status(pct=0), 0)
     t.step(status(pct=60), 600)
-    events = t.step(None, 660)
+    assert titles(t.step(None, 630)) == [] and titles(t.step(None, 660)) == []  # not yet: could be busy
+    events = t.step(None, 690)  # third failed poll in a row
     assert titles(events) == ["Printer went offline mid-print"] and events[0].priority == "high"
     assert t.history[-1].result == "lost"
     assert titles(t.step(None, 720)) == []
+
+
+def test_single_refused_polls_do_not_lose_the_job() -> None:
+    """Regression: the AD5X refuses ~1 poll in 15 mid-print; that must not alert or reset the job."""
+    t = JobTracker()
+    t.step(status(pct=0), 0)
+    for i, pct in enumerate([10, 20, 30, 40], start=1):
+        assert titles(t.step(None, i * 120 - 30)) == []  # one refused poll...
+        assert titles(t.step(status(pct=pct), i * 120)) == []  # ...then back
+    assert t.job is not None and t.job.started == 0 and t.misses == 0
+    assert t.history == []
 
 
 def test_pause_and_cancel() -> None:

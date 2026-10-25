@@ -1,0 +1,11 @@
+# solar-forecast.timer - hourly (the free API allows 12 requests per hour per IP)
+[Unit]
+Description=Refresh the solar forecast hourly
+
+[Timer]
+OnBootSec=3min
+OnCalendar=*-*-* *:07
+Persistent=true
+
+[Install]
+WantedBy=timers.target

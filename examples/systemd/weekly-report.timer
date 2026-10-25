@@ -1,0 +1,10 @@
+# weekly-report.timer - Tuesday 08:00, when Octopus has published the whole previous week
+[Unit]
+Description=Weekly energy summary
+
+[Timer]
+OnCalendar=Tue *-*-* 08:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

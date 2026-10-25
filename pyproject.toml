@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "homelab-tools"
-version = "0.1.1"
+version = "0.2.0"
 description = "Small, read-only monitors for a home lab: Octopus Energy costs, Solis inverters, FlashForge AD5X, tado, Pod Point, Pi-hole threat alerts and OpenCanary - feeding ntfy, VictoriaMetrics and dashboards."
 readme = "README.md"
 authors = [{ name = "Rich Spokes" }]
@@ -33,6 +33,8 @@ tado-monitor = "homelab_tools.tado.monitor:main"
 podpoint-monitor = "homelab_tools.podpoint.monitor:main"
 pihole-threat-alert = "homelab_tools.pihole_threats.alert:main"
 opencanary-ntfy = "homelab_tools.opencanary_ntfy.relay:main"
+solar-forecast = "homelab_tools.forecast.solar:main"
+weekly-report = "homelab_tools.report.weekly:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

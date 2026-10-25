@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+* New `solar-forecast`: Forecast.Solar estimate for today and tomorrow, status file and a daily
+  forecast curve for comparing with actual generation.
+* New `weekly-report`: Monday-to-Sunday energy summary (bill, solar, battery, car, off-peak share,
+  gas, heating) with week-on-week changes, sent via ntfy.
+
 ## 0.1.1
 
 * `podpoint-monitor`: reuse one Pod Point sign-in (also across restarts) instead of creating a new

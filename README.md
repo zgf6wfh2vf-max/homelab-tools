@@ -39,6 +39,8 @@ flowchart LR
 | `podpoint-monitor` | Real charger state ("waiting for 00:30", not just "charging"), session energy and cost, alerts | [podpoint](docs/podpoint.md) |
 | `tado-monitor` / `tado-auth` | Room temperatures, targets, heating demand, weather; battery-low and offline alerts | [tado](docs/tado.md) |
 | `ad5x-monitor` | FlashForge AD5X job progress, finish-time estimate, temperatures; alerts for start / finish / pause / power loss mid-print | [ad5x](docs/ad5x.md) |
+| `solar-forecast` | Today's and tomorrow's expected solar generation from Forecast.Solar | [solar-forecast](docs/solar-forecast.md) |
+| `weekly-report` | Monday-to-Sunday energy summary to your phone: bill, solar, car, heating, vs. the week before | [weekly-report](docs/weekly-report.md) |
 | `pihole-threat-alert` | Alerts when a device looks up a domain on a threat-intelligence list | [pihole-threat-alert](docs/pihole-threat-alert.md) |
 | `opencanary-ntfy` | Turns OpenCanary honeypot logs into readable, rate-limited alerts | [opencanary-ntfy](docs/opencanary-ntfy.md) |
 | `scripts/sqlite-snapshot-backup` | Daily hard-link snapshots with consistent copies of live SQLite databases | [sqlite-snapshot-backup](docs/sqlite-snapshot-backup.md) |

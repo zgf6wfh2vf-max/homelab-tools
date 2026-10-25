@@ -8,9 +8,13 @@ from pathlib import Path
 import pytest
 
 from homelab_tools.ad5x.tracker import JobTracker
+from homelab_tools.forecast.solar import Forecast
+from homelab_tools.forecast.solar import status as forecast_status
 from homelab_tools.octopus.pricing import DayTotals, summarise
 from homelab_tools.podpoint.model import charger_state
 from homelab_tools.podpoint.model import display as ev_display
+from homelab_tools.report.weekly import WeekFigures
+from homelab_tools.report.weekly import display as weekly_display
 from homelab_tools.solis.registers import REGISTER_BLOCKS, decode, display_fields
 from homelab_tools.tado.model import display as tado_display
 
@@ -39,6 +43,8 @@ def documented(page: str) -> str:
             ev_display(charger_state("available", "", ""), "", None, [], [], datetime.now(UTC)).keys(),
         ),
         ("tado.md", tado_display([], 0.0, "SUN", 0, []).keys()),
+        ("solar-forecast.md", forecast_status(Forecast({}, {}), date(2026, 1, 1), None).keys()),
+        ("weekly-report.md", weekly_display(WeekFigures(date(2026, 1, 5)), None).keys()),
     ],
 )
 def test_status_fields_are_documented(page: str, keys) -> None:

@@ -12,7 +12,7 @@
   "to": "now"
  },
  "schemaVersion": 39,
- "version": 3,
+ "version": 4,
  "timepicker": {
   "refresh_intervals": [
    "30s",
@@ -298,6 +298,15 @@
      "expr": "solis_grid_w",
      "legendFormat": "Grid (+ export)",
      "refId": "D"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "forecast_solar_w",
+     "legendFormat": "Solar forecast",
+     "refId": "E"
     }
    ],
    "options": {
@@ -378,6 +387,39 @@
          "mode": "fixed",
          "fixedColor": "purple"
         }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Solar forecast"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#F2CC0C"
+        }
+       },
+       {
+        "id": "custom.lineStyle",
+        "value": {
+         "fill": "dash",
+         "dash": [
+          8,
+          6
+         ]
+        }
+       },
+       {
+        "id": "custom.fillOpacity",
+        "value": 0
+       },
+       {
+        "id": "custom.lineWidth",
+        "value": 2
        }
       ]
      }
@@ -636,6 +678,16 @@
      "legendFormat": "Export",
      "refId": "D",
      "interval": "1d"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "max_over_time(forecast_solar_day_kwh[1d] offset -1d)",
+     "legendFormat": "Forecast",
+     "refId": "E",
+     "interval": "1d"
     }
    ],
    "options": {
@@ -740,6 +792,21 @@
        {
         "id": "unit",
         "value": "time:ddd D"
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Forecast"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#FADE2A80"
+        }
        }
       ]
      }

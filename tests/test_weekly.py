@@ -104,6 +104,15 @@ def test_partial_and_empty_weeks() -> None:
     _, message = format_report(partial, None)
     assert "Costs cover 5 of 7 days so far." in message and "Solar" not in message
     assert "than the week before" not in message
+
+
+def test_part_weeks_are_not_compared() -> None:
+    full = collect(FakeVM(FULL), date(2026, 10, 12))
+    part = collect(FakeVM(FULL | {"solis_pv_today_kwh": 5.0}, octopus_days=5), date(2026, 10, 19))
+    _, message = format_report(part, full)
+    assert "than the week before" not in message
+    one_day = WeekFigures(date(2026, 10, 19), solar_kwh=17.0, solar_days=1)
+    assert "Solar 17 kWh (1 day recorded)." in format_report(one_day, None)[1]
     empty = WeekFigures(date(2026, 10, 26))
     assert format_report(empty, None) == ("Week 26 Oct-1 Nov", "No data was recorded this week.")
 

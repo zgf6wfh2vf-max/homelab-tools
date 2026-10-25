@@ -206,7 +206,9 @@ def format_report(w: WeekFigures, prev: WeekFigures | None) -> tuple[str, str]:
             parts.append(f"gas {_pounds(w.gas_p)}")
         if w.export_earn_p:
             parts.append(f"export -{_pounds(w.export_earn_p)}")
-        change = _change(w.net_p, prev.net_p if prev else None, "", money=True)
+        # comparing a part-week with a full week would mislead: only compare complete weeks
+        comparable = prev is not None and w.octopus_days == 7 and prev.octopus_days == 7
+        change = _change(w.net_p, prev.net_p if comparable and prev else None, "", money=True)
         line = f"Bill {_pounds(w.net_p)} ({', '.join(parts)})" + (f" - {change}" if change else "") + "."
         if w.octopus_days < 7:
             line += f" Costs cover {w.octopus_days} of 7 days so far."
@@ -214,7 +216,7 @@ def format_report(w: WeekFigures, prev: WeekFigures | None) -> tuple[str, str]:
     if w.solar_kwh is not None:
         line = f"Solar {w.solar_kwh:.0f} kWh"
         if w.solar_days < 7:
-            line += f" ({w.solar_days} days recorded)"
+            line += f" ({w.solar_days} day{'s' if w.solar_days != 1 else ''} recorded)"
         if w.battery_out_kwh is not None:
             line += f", battery supplied {w.battery_out_kwh:.0f} kWh"
         lines.append(line + ".")
@@ -227,7 +229,8 @@ def format_report(w: WeekFigures, prev: WeekFigures | None) -> tuple[str, str]:
         usage.append(f"{w.offpeak_share * 100:.0f}% of grid import off-peak")
     if w.gas_kwh:
         gas = f"gas {w.gas_kwh:.0f} kWh"
-        change = _change(w.gas_kwh, prev.gas_kwh if prev else None, "kWh")
+        comparable = prev is not None and w.octopus_days == 7 and prev.octopus_days == 7
+        change = _change(w.gas_kwh, prev.gas_kwh if comparable and prev else None, "kWh")
         usage.append(gas + (f" ({change})" if change else ""))
     if w.heating_pct is not None:
         outside = f", outside {w.outside_c:.1f}°C on average" if w.outside_c is not None else ""

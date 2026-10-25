@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+* `weekly-report`: only compare with the previous week when both weeks have complete cost data;
+  "1 day recorded" grammar.
+* Example dashboards: dashed forecast line on the power chart and forecast bars on daily energy.
+
 ## 0.2.0
 
 * New `solar-forecast`: Forecast.Solar estimate for today and tomorrow, status file and a daily

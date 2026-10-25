@@ -12,7 +12,7 @@
   "to": "now"
  },
  "schemaVersion": 39,
- "version": 6,
+ "version": 7,
  "timepicker": {
   "refresh_intervals": [
    "30s",
@@ -401,7 +401,7 @@
         "id": "color",
         "value": {
          "mode": "fixed",
-         "fixedColor": "#F2CC0C"
+         "fixedColor": "#C7C7C7"
         }
        },
        {
@@ -806,12 +806,12 @@
         "id": "color",
         "value": {
          "mode": "fixed",
-         "fixedColor": "#F2CC0C"
+         "fixedColor": "#C7C7C7"
         }
        },
        {
         "id": "custom.fillOpacity",
-        "value": 25
+        "value": 12
        },
        {
         "id": "custom.lineWidth",

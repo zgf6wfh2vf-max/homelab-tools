@@ -13,7 +13,7 @@
   "to": "now"
  },
  "schemaVersion": 39,
- "version": 8,
+ "version": 9,
  "description": "Small transparent panels for embedding in a dashboard (e.g. Homepage iframe widgets).",
  "panels": [
   {
@@ -149,7 +149,7 @@
         "id": "color",
         "value": {
          "mode": "fixed",
-         "fixedColor": "#F2CC0C"
+         "fixedColor": "#C7C7C7"
         }
        },
        {
@@ -483,12 +483,12 @@
         "id": "color",
         "value": {
          "mode": "fixed",
-         "fixedColor": "#F2CC0C"
+         "fixedColor": "#C7C7C7"
         }
        },
        {
         "id": "custom.fillOpacity",
-        "value": 25
+        "value": 12
        },
        {
         "id": "custom.lineWidth",

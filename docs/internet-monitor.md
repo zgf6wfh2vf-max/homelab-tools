@@ -34,6 +34,15 @@ seconds and uploads for about 10 seconds over four parallel connections. Each co
 warm-up transfer first, which isn't counted. A test uses roughly as many megabytes as your speed in
 Mbps (about 150 MB on a 150 Mbps line), so four tests a day come to a few GB a month.
 
+**Where you run it matters.** A test measures everything between the machine and Cloudflare. If
+the machine reaches the router over powerline, Wi-Fi or a mesh link, that hop is usually slower than
+a fast fibre line, so the test measures the hop and not the broadband. (A Magic 2 powerline pair
+tests at about 330 Mbps on a 900 Mbps line.) Those figures still show what that room actually gets,
+but they aren't evidence of a broadband fault. For true
+line speed, run `speedtest` on a machine wired straight into the router. Outage detection works
+from anywhere: a dropped powerline or mesh link shows up as a "home network" outage, because the
+router stops answering too.
+
 A test competes with whatever else is using the line, so a single low figure means little. That is
 why the alert needs **three slow tests in a row** under `INTERNET_MIN_DOWN_MBPS`. Set that to the
 minimum guaranteed speed in your broadband contract (UK providers that follow Ofcom's code must

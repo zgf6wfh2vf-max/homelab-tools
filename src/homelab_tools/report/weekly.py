@@ -224,7 +224,7 @@ def systems_line(w: WeekFigures) -> str | None:
         parts.append("no internet outages")
     if w.download_mbps is not None:
         up = f", up {w.upload_mbps:.0f}" if w.upload_mbps is not None else ""
-        parts.append(f"broadband {w.download_mbps:.0f} Mbps down{up}")
+        parts.append(f"speed tests {w.download_mbps:.0f} Mbps down{up}")
     if w.powerline_min_mbps is not None and w.powerline_max_mbps is not None:
         low, high = w.powerline_min_mbps, w.powerline_max_mbps
         parts.append(

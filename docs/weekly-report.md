@@ -8,7 +8,7 @@ Bill £17.63 (electric £12.50, gas £7.33, export -£2.20) - £2.10 less than t
 Solar 38 kWh, battery supplied 42 kWh.
 Car 61 kWh, £3.40 (3 charges).
 92% of grid import off-peak; gas 160 kWh (20 kWh more than the week before); heating demand 12%, outside 9.8°C on average.
-Systems: internet down twice (9 min in total); broadband 142 Mbps down, up 31; powerline 1144-1331 Mbps; battery health 99%; server OK; last restore test passed (1 Nov 10:13).
+Systems: internet down twice (9 min in total); speed tests 142 Mbps down, up 31; powerline 1144-1331 Mbps; battery health 99%; server OK; last restore test passed (1 Nov 10:13).
 ```
 
 Each line appears only when its data exists:

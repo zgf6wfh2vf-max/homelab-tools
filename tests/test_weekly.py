@@ -161,8 +161,8 @@ def test_systems_line(tmp_path) -> None:
     read_status_files(w, str(tmp_path))
     _, message = format_report(w, None)
     assert message == (
-        "Systems: internet down twice (9 min in total); broadband 142 Mbps down, up 31; powerline 1144-1331 "
-        "Mbps; battery health 99%; server OK; last restore test passed (1 Oct 10:13)."
+        "Systems: internet down twice (9 min in total); speed tests 142 Mbps down, up 31; powerline "
+        "1144-1331 Mbps; battery health 99%; server OK; last restore test passed (1 Oct 10:13)."
     )
     d = display(w, None)
     assert (d["outages"], d["broadband"], d["powerline"]) == ("2, 9 min", "142 / 31 Mbps", "1144-1331 Mbps")

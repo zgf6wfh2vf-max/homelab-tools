@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+* New `tariff-compare`: monthly comparison of other Octopus tariffs on your actual half-hourly use,
+  moving battery/EV charging to each tariff's cheapest night slots; new tariffs at today's prices;
+  reports when fixed deals end.
+* New `usage-watch`: gas against a degree-day model of your house fitted to a year of data
+  (Open-Meteo temperatures), and a two-day always-on electricity load check.
+* New `host-health`: heat, under-voltage and throttling, failed systemd units, memory, disks, SD-card
+  writes and pending reboots, each with a delay before alerting and an "OK again" when it clears.
+
 ## 0.3.1
 
 * `octopus-collector`: the solar saving is only shown for days fully covered by house-use data. The

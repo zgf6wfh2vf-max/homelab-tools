@@ -13,6 +13,10 @@ from homelab_tools.backup.restore_test import display as restore_display
 from homelab_tools.battery.check import Outlook, outlook_display
 from homelab_tools.forecast.solar import Forecast
 from homelab_tools.forecast.solar import status as forecast_status
+from homelab_tools.host.health import Finding
+from homelab_tools.host.health import display as host_display
+from homelab_tools.octopus.compare import Comparison
+from homelab_tools.octopus.compare import display as tariff_display
 from homelab_tools.octopus.pricing import DayTotals, summarise
 from homelab_tools.podpoint.model import charger_state
 from homelab_tools.podpoint.model import display as ev_display
@@ -50,6 +54,12 @@ def documented(page: str) -> str:
         (
             "battery-check.md",
             ["overnight", "checked", *outlook_display(Outlook(datetime.now(UTC), 0, 0, 0, 0, None))],
+        ),
+        ("tariff-compare.md", tariff_display(Comparison("x", 0, 0, 0)).keys()),
+        ("host-health.md", [*host_display(None, None, [], None, Finding("memory", None)), "checked"]),
+        (
+            "usage-watch.md",
+            ["gas_day", "gas_used", "gas_expected", "gas_outside", "base_now", "base_usual", "checked"],
         ),
         ("restic-restore-test.md", restore_display(Report()).keys()),
         ("weekly-report.md", weekly_display(WeekFigures(date(2026, 1, 5)), None).keys()),

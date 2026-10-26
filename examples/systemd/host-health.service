@@ -1,0 +1,20 @@
+# host-health.service - Server health checks (heat, power, failed units, disks, SD wear)
+# Install: see docs/host-health.md. Settings live in /etc/homelab-tools/host-health.env.
+[Unit]
+Description=Server health checks (heat, power, failed units, disks, SD wear)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/homelab-tools/bin/host-health
+EnvironmentFile=/etc/homelab-tools/host-health.env
+User=homelab
+Group=homelab
+SupplementaryGroups=video
+StateDirectory=host-health
+ReadWritePaths=/var/lib/homelab-status
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes

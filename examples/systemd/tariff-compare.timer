@@ -1,0 +1,10 @@
+# tariff-compare.timer - the 4th of each month, when Octopus has published the whole previous month
+[Unit]
+Description=Monthly Octopus tariff comparison
+
+[Timer]
+OnCalendar=*-*-04 09:30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

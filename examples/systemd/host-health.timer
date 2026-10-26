@@ -1,0 +1,10 @@
+# host-health.timer - every five minutes
+[Unit]
+Description=Server health checks
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+# usage-watch.timer - daily, after the morning octopus-collector run
+[Unit]
+Description=Daily unusual-usage check
+
+[Timer]
+OnCalendar=*-*-* 10:40
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,18 @@
+# tariff-compare.service - Price last month's usage on other Octopus tariffs
+# Install: see docs/tariff-compare.md. Settings live in /etc/homelab-tools/tariff-compare.env.
+[Unit]
+Description=Price last month's usage on other Octopus tariffs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/homelab-tools/bin/tariff-compare
+EnvironmentFile=/etc/homelab-tools/tariff-compare.env
+User=homelab
+Group=homelab
+ReadWritePaths=/var/lib/homelab-status
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes

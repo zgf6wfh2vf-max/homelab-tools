@@ -22,6 +22,8 @@ from homelab_tools.octopus.sessions import Snapshot
 from homelab_tools.octopus.sessions import display as sessions_display
 from homelab_tools.podpoint.model import charger_state
 from homelab_tools.podpoint.model import display as ev_display
+from homelab_tools.powerline.monitor import State as PowerlineState
+from homelab_tools.powerline.monitor import display as powerline_display
 from homelab_tools.report.weekly import WeekFigures
 from homelab_tools.report.weekly import display as weekly_display
 from homelab_tools.solis.health import DayStats
@@ -67,6 +69,7 @@ def documented(page: str) -> str:
             "usage-watch.md",
             ["gas_day", "gas_used", "gas_expected", "gas_outside", "base_now", "base_usual", "checked"],
         ),
+        ("powerline-monitor.md", [*powerline_display({}, PowerlineState(), []), "checked"]),
         ("restic-restore-test.md", restore_display(Report()).keys()),
         ("weekly-report.md", weekly_display(WeekFigures(date(2026, 1, 5)), None).keys()),
     ],

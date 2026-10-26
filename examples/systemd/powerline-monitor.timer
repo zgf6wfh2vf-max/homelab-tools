@@ -1,0 +1,10 @@
+# powerline-monitor.timer - every five minutes
+[Unit]
+Description=Powerline adapter checks
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

@@ -49,6 +49,7 @@ flowchart LR
 | `octopus-sessions` | Alerts when Octopus announces Power Down / Power Up sessions or free-electricity events, and reports each joined session's result (including "missing readings") | [octopus-sessions](docs/octopus-sessions.md) |
 | `usage-watch` | Daily: gas use out of line with the weather, or an always-on electricity load that has jumped | [usage-watch](docs/usage-watch.md) |
 | `host-health` | Every 5 min: server heat, under-voltage, failed services, memory, disks, SD-card wear, pending reboots | [host-health](docs/host-health.md) |
+| `powerline-monitor` | Every 5 min: devolo powerline link speeds, adapters offline, restarts and firmware updates | [powerline-monitor](docs/powerline-monitor.md) |
 | `restic-restore-test` | Monthly proof that the restic backup restores: a random sample, byte-compared with the originals, databases checked | [restic-restore-test](docs/restic-restore-test.md) |
 | `scripts/ssh-login-alert` | Phone alert for every SSH login, from PAM, never delaying the login | [ssh-login-alert](docs/ssh-login-alert.md) |
 | `scripts/sqlite-snapshot-backup` | Daily hard-link snapshots with consistent copies of live SQLite databases | [sqlite-snapshot-backup](docs/sqlite-snapshot-backup.md) |

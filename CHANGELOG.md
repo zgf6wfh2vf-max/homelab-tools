@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0
+
+* New `powerline-monitor`: reads devolo Magic adapters' status files for link speed in each
+  direction, offline adapters, lost links and links running at under half their usual speed, plus
+  restarts and firmware changes. Read-only; no devolo software needed.
+
 ## 0.6.0
 
 * New `solar-health`: daily dead-string and string-balance checks (each string against the other),

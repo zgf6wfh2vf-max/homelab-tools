@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+* New `restic-restore-test`: restores a random sample of files from the newest restic snapshot
+  and checks them (size, byte-for-byte against unchanged originals, SQLite `quick_check`), with a
+  monthly timer, ntfy alerts and a status file.
+
 ## 0.2.4
 
 * `ad5x-monitor`: only report "offline mid-print" after 3 failed polls in a row. The printer refuses

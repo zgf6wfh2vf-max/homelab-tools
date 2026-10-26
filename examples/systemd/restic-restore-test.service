@@ -1,0 +1,22 @@
+# restic-restore-test.service - Restore a sample of files from the newest restic snapshot and check them
+# Install: see docs/restic-restore-test.md. Runs as root: backed-up files and the restic password are root-only.
+[Unit]
+Description=Backup restore test (restic)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Your backup job's restic settings (RESTIC_REPOSITORY, RESTIC_PASSWORD_FILE, cloud credentials)
+EnvironmentFile=/etc/restic/restic.env
+EnvironmentFile=/etc/homelab-tools/restic-restore-test.env
+ExecStart=/opt/homelab-tools/bin/restic-restore-test
+CacheDirectory=restic
+Environment=RESTIC_CACHE_DIR=/var/cache/restic
+Nice=10
+IOSchedulingClass=idle
+ProtectSystem=strict
+ReadWritePaths=/var/tmp /var/lib/homelab-status
+ProtectHome=read-only
+PrivateTmp=yes
+NoNewPrivileges=yes

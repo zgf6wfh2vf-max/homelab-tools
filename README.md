@@ -2,7 +2,7 @@
 
 Small, **read-only** monitors for a home lab: energy (Octopus Energy, Solis inverters, Pod Point
 chargers), heating (tado°), a FlashForge AD5X 3D printer, and two security helpers for Pi-hole and
-OpenCanary - plus a backup script and a Pi-hole failover recipe.
+OpenCanary - plus backup tools (snapshots and restore tests) and a Pi-hole failover recipe.
 
 They are plain Python (standard library only, except the Pod Point monitor), run as systemd services,
 and publish to three optional, interchangeable outputs:
@@ -43,6 +43,7 @@ flowchart LR
 | `weekly-report` | Monday-to-Sunday energy summary to your phone: bill, solar, car, heating, vs. the week before | [weekly-report](docs/weekly-report.md) |
 | `pihole-threat-alert` | Alerts when a device looks up a domain on a threat-intelligence list | [pihole-threat-alert](docs/pihole-threat-alert.md) |
 | `opencanary-ntfy` | Turns OpenCanary honeypot logs into readable, rate-limited alerts | [opencanary-ntfy](docs/opencanary-ntfy.md) |
+| `restic-restore-test` | Monthly proof that the restic backup restores: a random sample, byte-compared with the originals, databases checked | [restic-restore-test](docs/restic-restore-test.md) |
 | `scripts/sqlite-snapshot-backup` | Daily hard-link snapshots with consistent copies of live SQLite databases | [sqlite-snapshot-backup](docs/sqlite-snapshot-backup.md) |
 | `examples/keepalived` | Two Pi-holes sharing one DNS address, with automatic failover | [pihole-failover](docs/pihole-failover.md) |
 

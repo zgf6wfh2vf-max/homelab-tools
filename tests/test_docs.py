@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 
 from homelab_tools.ad5x.tracker import JobTracker
+from homelab_tools.backup.restore_test import Report
+from homelab_tools.backup.restore_test import display as restore_display
 from homelab_tools.forecast.solar import Forecast
 from homelab_tools.forecast.solar import status as forecast_status
 from homelab_tools.octopus.pricing import DayTotals, summarise
@@ -44,6 +46,7 @@ def documented(page: str) -> str:
         ),
         ("tado.md", tado_display([], 0.0, "SUN", 0, []).keys()),
         ("solar-forecast.md", forecast_status(Forecast({}, {}), date(2026, 1, 1), None).keys()),
+        ("restic-restore-test.md", restore_display(Report()).keys()),
         ("weekly-report.md", weekly_display(WeekFigures(date(2026, 1, 5)), None).keys()),
     ],
 )

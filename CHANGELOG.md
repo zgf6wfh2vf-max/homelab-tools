@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+* New `octopus-sessions`: announces Power Down / Power Up sessions (backend `savingSessions`) and
+  free-electricity / regional Power-up campaign events, says whether you joined, and reports each
+  joined session's result, including `MISSING_READINGS` (no reward calculated).
+
 ## 0.4.0
 
 * New `tariff-compare`: monthly comparison of other Octopus tariffs on your actual half-hourly use,

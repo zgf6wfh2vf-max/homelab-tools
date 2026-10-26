@@ -18,6 +18,8 @@ from homelab_tools.host.health import display as host_display
 from homelab_tools.octopus.compare import Comparison
 from homelab_tools.octopus.compare import display as tariff_display
 from homelab_tools.octopus.pricing import DayTotals, summarise
+from homelab_tools.octopus.sessions import Snapshot
+from homelab_tools.octopus.sessions import display as sessions_display
 from homelab_tools.podpoint.model import charger_state
 from homelab_tools.podpoint.model import display as ev_display
 from homelab_tools.report.weekly import WeekFigures
@@ -55,6 +57,7 @@ def documented(page: str) -> str:
             "battery-check.md",
             ["overnight", "checked", *outlook_display(Outlook(datetime.now(UTC), 0, 0, 0, 0, None))],
         ),
+        ("octopus-sessions.md", [*sessions_display(Snapshot(), datetime.now(UTC)), "checked"]),
         ("tariff-compare.md", tariff_display(Comparison("x", 0, 0, 0)).keys()),
         ("host-health.md", [*host_display(None, None, [], None, Finding("memory", None)), "checked"]),
         (

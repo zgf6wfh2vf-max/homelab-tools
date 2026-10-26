@@ -1,0 +1,11 @@
+# octopus-sessions.timer - every 30 minutes (sessions are announced hours to a day ahead)
+[Unit]
+Description=Octopus flexibility session check
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=30min
+RandomizedDelaySec=2min
+
+[Install]
+WantedBy=timers.target

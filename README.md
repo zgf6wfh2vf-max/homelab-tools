@@ -45,6 +45,7 @@ flowchart LR
 | `pihole-threat-alert` | Alerts when a device looks up a domain on a threat-intelligence list | [pihole-threat-alert](docs/pihole-threat-alert.md) |
 | `opencanary-ntfy` | Turns OpenCanary honeypot logs into readable, rate-limited alerts | [opencanary-ntfy](docs/opencanary-ntfy.md) |
 | `tariff-compare` | Monthly: last month's real half-hourly use priced on other Octopus tariffs (Agile, Flux, Go, fixed...), with battery/EV charging moved to each tariff's cheap times | [tariff-compare](docs/tariff-compare.md) |
+| `octopus-sessions` | Alerts when Octopus announces Power Down / Power Up sessions or free-electricity events, and reports each joined session's result (including "missing readings") | [octopus-sessions](docs/octopus-sessions.md) |
 | `usage-watch` | Daily: gas use out of line with the weather, or an always-on electricity load that has jumped | [usage-watch](docs/usage-watch.md) |
 | `host-health` | Every 5 min: server heat, under-voltage, failed services, memory, disks, SD-card wear, pending reboots | [host-health](docs/host-health.md) |
 | `restic-restore-test` | Monthly proof that the restic backup restores: a random sample, byte-compared with the originals, databases checked | [restic-restore-test](docs/restic-restore-test.md) |

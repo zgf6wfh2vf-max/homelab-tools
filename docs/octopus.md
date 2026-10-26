@@ -42,7 +42,8 @@ as Octopus Go or Agile, tariff switches mid-month, and daily standing charges.
 * **Net** = electricity + gas (incl. standing charges) − export earnings.
 * **Solar saving** = house use × import rate (what it would have cost with no solar or battery)
   − what was paid for imports + export earnings. It needs `HOUSE_LOAD_METRIC` and shows
-  "pending" until Octopus data overlaps the house-load data.
+  "pending" until Octopus has published a day that house-load data covers completely (so the first
+  day of monitoring, which starts part-way through, is skipped).
 * **Gas**: SMETS2 meters report m³; kWh uses a typical calorific value (39.5 MJ/m³). Your bill uses
   the actual value, so expect differences of a percent or two.
 

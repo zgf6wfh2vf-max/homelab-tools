@@ -115,6 +115,9 @@ def test_part_weeks_are_not_compared() -> None:
     assert "Solar 17 kWh (1 day recorded)." in format_report(one_day, None)[1]
     d = display(part, full)
     assert d["net_change"] == d["gas_change"] == "-"  # cost comparisons need complete weeks
+    first_solar_day = collect(FakeVM(FULL), date(2026, 10, 19))
+    first_solar_day.solar_days = 1  # inverter monitoring started on the last day of the week
+    assert display(full, first_solar_day)["solar_change"] == "-"
     empty = WeekFigures(date(2026, 10, 26))
     assert format_report(empty, None) == ("Week 26 Oct-1 Nov", "No data was recorded this week.")
 

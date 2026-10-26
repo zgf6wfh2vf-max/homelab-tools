@@ -142,13 +142,21 @@ def test_saving_needs_house_data() -> None:
     day = DayTotals(import_cost_p=200, export_earn_p=50)
     assert day.saving_p is None
     day.nosolar_cost_p = 600
-    assert day.saving_p == 450  # 600 - 200 + 50
+    assert day.saving_p == 450  # 600 - 200 + 50 (no slot counts: built directly)
+
+
+def test_saving_needs_house_data_for_the_whole_day() -> None:
+    day = DayTotals(import_cost_p=200, export_earn_p=50, import_slots=48, nosolar_cost_p=300, house_slots=22)
+    assert day.saving_p is None  # monitoring started mid-day: half a day's use against a whole bill
+    day.house_slots = 48
+    assert day.saving_p == 150
 
 
 def test_house_use_priced_at_import_rate() -> None:
     ledger = Ledger()
     ledger.add_house_use({T0 + timedelta(hours=1): 0.4, T0 + timedelta(hours=9): 0.4}, go_rates())
     assert ledger.days[date(2026, 1, 10)].nosolar_cost_p == pytest.approx(0.4 * GO_CHEAP + 0.4 * GO_PEAK)
+    assert ledger.days[date(2026, 1, 10)].house_slots == 2
 
 
 def test_summary_picks_latest_complete_day_and_month() -> None:

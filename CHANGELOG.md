@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+* `octopus-collector`: the solar saving is only shown for days fully covered by house-use data. The
+  first day of inverter monitoring compared a whole day's bill with part of a day's use.
+* `weekly-report`: the solar change also needs two weeks with all 7 days of solar data.
+
 ## 0.3.0
 
 * New `battery-check`: a morning alert if the home battery did not charge in the cheap window, and an

@@ -49,6 +49,7 @@ class DayTotals:
     gas_cost_p: float = 0.0
     standing_p: dict[str, float] = field(default_factory=dict)  # fuel -> pence
     nosolar_cost_p: float = 0.0
+    house_slots: int = 0  # half-hours with house-use data
 
     @property
     def complete(self) -> bool:
@@ -80,8 +81,12 @@ class DayTotals:
         Defined as: what the house's own use would have cost at the import rates with no solar or
         battery, minus what was actually paid for imports, plus export earnings. Standing charges
         are left out because they are paid either way.
+
+        The saving is only given for days where every imported half-hour also has house-use data:
+        a part-covered day (e.g. the first day of inverter monitoring) would compare a whole day's
+        bill with part of a day's use.
         """
-        if not self.nosolar_cost_p:
+        if not self.nosolar_cost_p or self.house_slots < self.import_slots:
             return None
         return self.nosolar_cost_p - self.import_cost_p + self.export_earn_p
 
@@ -183,6 +188,7 @@ class Ledger:
             rate = import_rates.at(moment)
             if rate is not None:
                 self.days[local_day(moment)].nosolar_cost_p += kwh * rate
+                self.days[local_day(moment)].house_slots += 1
                 self._point("nosolar_cost_p", moment, kwh * rate)
 
 

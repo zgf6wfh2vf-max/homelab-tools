@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+
+* New `solar-health`: daily dead-string and string-balance checks (each string against the other),
+  a week of generation against the forecast, and battery state-of-health alerts; counts cycles.
+* New `scripts/ssh-login-alert`: PAM hook that sends an ntfy alert for every SSH login, in the
+  background so logins are never delayed; allow-list and labels for known sources.
+* Example solar dashboard: power per string, battery health over a year, battery cycles.
+
 ## 0.5.0
 
 * New `octopus-sessions`: announces Power Down / Power Up sessions (backend `savingSessions`) and

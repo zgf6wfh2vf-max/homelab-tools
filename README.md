@@ -40,6 +40,7 @@ flowchart LR
 | `tado-monitor` / `tado-auth` | Room temperatures, targets, heating demand, weather; battery-low and offline alerts | [tado](docs/tado.md) |
 | `ad5x-monitor` | FlashForge AD5X job progress, finish-time estimate, temperatures; alerts for start / finish / pause / power loss mid-print | [ad5x](docs/ad5x.md) |
 | `solar-forecast` | Today's and tomorrow's expected solar generation from Forecast.Solar | [solar-forecast](docs/solar-forecast.md) |
+| `solar-health` | Daily: a dead or weakening solar string, a week of generation well below forecast, battery health falling | [solar-health](docs/solar-health.md) |
 | `battery-check` | Morning alert if the battery didn't charge overnight; evening heads-up when tomorrow's solar won't carry the house to the cheap rate | [battery-check](docs/battery-check.md) |
 | `weekly-report` | Monday-to-Sunday energy summary to your phone: bill, solar, car, heating, vs. the week before | [weekly-report](docs/weekly-report.md) |
 | `pihole-threat-alert` | Alerts when a device looks up a domain on a threat-intelligence list | [pihole-threat-alert](docs/pihole-threat-alert.md) |
@@ -49,6 +50,7 @@ flowchart LR
 | `usage-watch` | Daily: gas use out of line with the weather, or an always-on electricity load that has jumped | [usage-watch](docs/usage-watch.md) |
 | `host-health` | Every 5 min: server heat, under-voltage, failed services, memory, disks, SD-card wear, pending reboots | [host-health](docs/host-health.md) |
 | `restic-restore-test` | Monthly proof that the restic backup restores: a random sample, byte-compared with the originals, databases checked | [restic-restore-test](docs/restic-restore-test.md) |
+| `scripts/ssh-login-alert` | Phone alert for every SSH login, from PAM, never delaying the login | [ssh-login-alert](docs/ssh-login-alert.md) |
 | `scripts/sqlite-snapshot-backup` | Daily hard-link snapshots with consistent copies of live SQLite databases | [sqlite-snapshot-backup](docs/sqlite-snapshot-backup.md) |
 | `examples/keepalived` | Two Pi-holes sharing one DNS address, with automatic failover | [pihole-failover](docs/pihole-failover.md) |
 

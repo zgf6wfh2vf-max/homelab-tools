@@ -1,961 +1,1171 @@
 {
- "uid": "solar",
- "title": "Solar & battery",
- "tags": [
-  "solis"
- ],
- "timezone": "browser",
- "editable": true,
- "refresh": "1m",
- "time": {
-  "from": "now-24h",
-  "to": "now"
- },
- "schemaVersion": 39,
- "version": 7,
- "timepicker": {
-  "refresh_intervals": [
-   "30s",
-   "1m",
-   "5m",
-   "15m"
+  "uid": "solar",
+  "title": "Solar & battery",
+  "tags": [
+    "solis"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "schemaVersion": 39,
+  "version": 7,
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m"
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Solar now",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "last_over_time(solis_pv_w[5m])",
+          "legendFormat": "Solar now",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Battery",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "last_over_time(solis_soc[5m])",
+          "legendFormat": "Battery",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "green",
+                "value": 50
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Grid now (+ export / \u2212 import)",
+      "description": "Positive = exporting, negative = importing",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "last_over_time(solis_grid_w[5m])",
+          "legendFormat": "Grid now (+ export / \u2212 import)",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "House now",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "last_over_time(solis_load_w[5m])",
+          "legendFormat": "House now",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Power flows",
+      "description": "Battery: positive = charging, negative = discharging. Grid: positive = exporting, negative = importing.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "solis_pv_w",
+          "legendFormat": "Solar",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "solis_load_w",
+          "legendFormat": "House",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "solis_batt_w",
+          "legendFormat": "Battery (+ charging)",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "solis_grid_w",
+          "legendFormat": "Grid (+ export)",
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "forecast_solar_w",
+          "legendFormat": "Solar forecast",
+          "refId": "E",
+          "interval": "1h"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": 300000
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Solar"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "House"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Battery (+ charging)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Grid (+ export)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Solar forecast"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#C7C7C7"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Battery charge",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "solis_soc",
+          "legendFormat": "Charge",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": 300000
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Charge"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Inverter temperature",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 14
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "solis_inv_temp_c",
+          "legendFormat": "Inverter",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": 300000
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Inverter"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Grid voltage",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 14
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "solis_grid_v",
+          "legendFormat": "Voltage",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "volt",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": 300000
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Voltage"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": "barchart",
+      "title": "Daily energy",
+      "description": "Per-day totals from the inverter's daily counters",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 16,
+        "x": 0,
+        "y": 22
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "max_over_time(solis_pv_today_kwh[1d] offset -1d)",
+          "legendFormat": "Solar",
+          "refId": "A",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "max_over_time(solis_load_today_kwh[1d] offset -1d)",
+          "legendFormat": "House",
+          "refId": "B",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "max_over_time(solis_grid_in_today_kwh[1d] offset -1d)",
+          "legendFormat": "Import",
+          "refId": "C",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "max_over_time(solis_grid_out_today_kwh[1d] offset -1d)",
+          "legendFormat": "Export",
+          "refId": "D",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "max_over_time(forecast_solar_day_kwh[1d] offset -1d)",
+          "legendFormat": "Forecast",
+          "refId": "E",
+          "interval": "1d"
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "xField": "Time",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0,
+        "showValue": "never",
+        "stacking": "none",
+        "groupWidth": 0.8,
+        "barWidth": 0.95,
+        "barRadius": 0.05,
+        "fullHighlight": false,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth",
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "gradientMode": "none",
+            "axisSoftMin": 0
+          },
+          "decimals": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Solar"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "House"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Import"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Export"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:ddd D"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Forecast"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#C7C7C7"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 12
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "interval": "1d",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Time",
+            "mode": "outer"
+          }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "barchart",
+      "title": "Battery per day",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 22
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "max_over_time(solis_batt_in_today_kwh[1d] offset -1d)",
+          "legendFormat": "Charged",
+          "refId": "A",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "max_over_time(solis_batt_out_today_kwh[1d] offset -1d)",
+          "legendFormat": "Discharged",
+          "refId": "B",
+          "interval": "1d"
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "xField": "Time",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0,
+        "showValue": "never",
+        "stacking": "none",
+        "groupWidth": 0.8,
+        "barWidth": 0.95,
+        "barRadius": 0.05,
+        "fullHighlight": false,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth",
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "gradientMode": "none",
+            "axisSoftMin": 0
+          },
+          "decimals": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Charged"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Discharged"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:ddd D"
+              }
+            ]
+          }
+        ]
+      },
+      "interval": "1d",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Time",
+            "mode": "outer"
+          }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Solar strings",
+      "description": "Power from each string of panels. They rarely match exactly (shading, orientation); solar-health alerts when the usual balance between them changes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "solis_dc1_v * solis_dc1_a",
+          "legendFormat": "String 1",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "solis_dc2_v * solis_dc2_a",
+          "legendFormat": "String 2",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": 300000
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "String 1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "String 2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Battery health",
+      "description": "State of health reported by the battery, over the last year. Normal ageing is a point or two a year; warranties typically guarantee 70-80%.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 32
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "solis_soh",
+          "legendFormat": "Health",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "always",
+            "spanNulls": 300000,
+            "pointSize": 4
+          },
+          "min": 70,
+          "max": 100
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Health"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "timeFrom": "365d",
+      "interval": "1h"
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Battery cycles (365 days)",
+      "description": "Equivalent full cycles over complete days: kWh discharged / battery capacity. Set the divisor to your battery's kWh (10 here).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "vm"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 32
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "vm"
+          },
+          "expr": "sum_over_time(max_over_time(solis_batt_out_today_kwh[1d])[365d:1d]) / 10",
+          "legendFormat": "Cycles",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      }
+    }
   ]
- },
- "panels": [
-  {
-   "id": 1,
-   "type": "stat",
-   "title": "Solar now",
-   "description": "",
-   "datasource": {
-    "type": "prometheus",
-    "uid": "vm"
-   },
-   "gridPos": {
-    "h": 4,
-    "w": 6,
-    "x": 0,
-    "y": 0
-   },
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "last_over_time(solis_pv_w[5m])",
-     "legendFormat": "Solar now",
-     "refId": "A",
-     "instant": true
-    }
-   ],
-   "options": {
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ]
-    },
-    "colorMode": "value",
-    "graphMode": "none",
-    "textMode": "value"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "watt",
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "text",
-        "value": null
-       }
-      ]
-     }
-    },
-    "overrides": []
-   }
-  },
-  {
-   "id": 2,
-   "type": "stat",
-   "title": "Battery",
-   "description": "",
-   "datasource": {
-    "type": "prometheus",
-    "uid": "vm"
-   },
-   "gridPos": {
-    "h": 4,
-    "w": 6,
-    "x": 6,
-    "y": 0
-   },
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "last_over_time(solis_soc[5m])",
-     "legendFormat": "Battery",
-     "refId": "A",
-     "instant": true
-    }
-   ],
-   "options": {
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ]
-    },
-    "colorMode": "value",
-    "graphMode": "none",
-    "textMode": "value"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "percent",
-     "decimals": 0,
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "red",
-        "value": null
-       },
-       {
-        "color": "orange",
-        "value": 20
-       },
-       {
-        "color": "green",
-        "value": 50
-       }
-      ]
-     }
-    },
-    "overrides": []
-   }
-  },
-  {
-   "id": 3,
-   "type": "stat",
-   "title": "Grid now (+ export / \u2212 import)",
-   "description": "Positive = exporting, negative = importing",
-   "datasource": {
-    "type": "prometheus",
-    "uid": "vm"
-   },
-   "gridPos": {
-    "h": 4,
-    "w": 6,
-    "x": 12,
-    "y": 0
-   },
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "last_over_time(solis_grid_w[5m])",
-     "legendFormat": "Grid now (+ export / \u2212 import)",
-     "refId": "A",
-     "instant": true
-    }
-   ],
-   "options": {
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ]
-    },
-    "colorMode": "value",
-    "graphMode": "none",
-    "textMode": "value"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "watt",
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "red",
-        "value": null
-       },
-       {
-        "color": "green",
-        "value": 0
-       }
-      ]
-     }
-    },
-    "overrides": []
-   }
-  },
-  {
-   "id": 4,
-   "type": "stat",
-   "title": "House now",
-   "description": "",
-   "datasource": {
-    "type": "prometheus",
-    "uid": "vm"
-   },
-   "gridPos": {
-    "h": 4,
-    "w": 6,
-    "x": 18,
-    "y": 0
-   },
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "last_over_time(solis_load_w[5m])",
-     "legendFormat": "House now",
-     "refId": "A",
-     "instant": true
-    }
-   ],
-   "options": {
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ]
-    },
-    "colorMode": "value",
-    "graphMode": "none",
-    "textMode": "value"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "watt",
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "text",
-        "value": null
-       }
-      ]
-     }
-    },
-    "overrides": []
-   }
-  },
-  {
-   "id": 5,
-   "type": "timeseries",
-   "title": "Power flows",
-   "description": "Battery: positive = charging, negative = discharging. Grid: positive = exporting, negative = importing.",
-   "datasource": {
-    "type": "prometheus",
-    "uid": "vm"
-   },
-   "gridPos": {
-    "h": 10,
-    "w": 24,
-    "x": 0,
-    "y": 4
-   },
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "solis_pv_w",
-     "legendFormat": "Solar",
-     "refId": "A"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "solis_load_w",
-     "legendFormat": "House",
-     "refId": "B"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "solis_batt_w",
-     "legendFormat": "Battery (+ charging)",
-     "refId": "C"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "solis_grid_w",
-     "legendFormat": "Grid (+ export)",
-     "refId": "D"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "forecast_solar_w",
-     "legendFormat": "Solar forecast",
-     "refId": "E",
-     "interval": "1h"
-    }
-   ],
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom"
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "none"
-    }
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "watt",
-     "custom": {
-      "lineWidth": 2,
-      "fillOpacity": 10,
-      "showPoints": "never",
-      "spanNulls": 300000
-     }
-    },
-    "overrides": [
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Solar"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "yellow"
-        }
-       }
-      ]
-     },
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "House"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "blue"
-        }
-       }
-      ]
-     },
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Battery (+ charging)"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "green"
-        }
-       }
-      ]
-     },
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Grid (+ export)"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "purple"
-        }
-       }
-      ]
-     },
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Solar forecast"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "#C7C7C7"
-        }
-       },
-       {
-        "id": "custom.lineStyle",
-        "value": {
-         "fill": "dash",
-         "dash": [
-          8,
-          6
-         ]
-        }
-       },
-       {
-        "id": "custom.fillOpacity",
-        "value": 0
-       },
-       {
-        "id": "custom.lineWidth",
-        "value": 2
-       }
-      ]
-     }
-    ]
-   }
-  },
-  {
-   "id": 6,
-   "type": "timeseries",
-   "title": "Battery charge",
-   "description": "",
-   "datasource": {
-    "type": "prometheus",
-    "uid": "vm"
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 14
-   },
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "solis_soc",
-     "legendFormat": "Charge",
-     "refId": "A"
-    }
-   ],
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom"
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "none"
-    }
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "percent",
-     "custom": {
-      "lineWidth": 2,
-      "fillOpacity": 10,
-      "showPoints": "never",
-      "spanNulls": 300000
-     },
-     "min": 0,
-     "max": 100
-    },
-    "overrides": [
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Charge"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "green"
-        }
-       }
-      ]
-     }
-    ]
-   }
-  },
-  {
-   "id": 7,
-   "type": "timeseries",
-   "title": "Inverter temperature",
-   "description": "",
-   "datasource": {
-    "type": "prometheus",
-    "uid": "vm"
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 6,
-    "x": 12,
-    "y": 14
-   },
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "solis_inv_temp_c",
-     "legendFormat": "Inverter",
-     "refId": "A"
-    }
-   ],
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom"
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "none"
-    }
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "celsius",
-     "custom": {
-      "lineWidth": 2,
-      "fillOpacity": 10,
-      "showPoints": "never",
-      "spanNulls": 300000
-     }
-    },
-    "overrides": [
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Inverter"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "orange"
-        }
-       }
-      ]
-     }
-    ]
-   }
-  },
-  {
-   "id": 8,
-   "type": "timeseries",
-   "title": "Grid voltage",
-   "description": "",
-   "datasource": {
-    "type": "prometheus",
-    "uid": "vm"
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 6,
-    "x": 18,
-    "y": 14
-   },
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "solis_grid_v",
-     "legendFormat": "Voltage",
-     "refId": "A"
-    }
-   ],
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom"
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "none"
-    }
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "volt",
-     "custom": {
-      "lineWidth": 2,
-      "fillOpacity": 10,
-      "showPoints": "never",
-      "spanNulls": 300000
-     }
-    },
-    "overrides": [
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Voltage"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "purple"
-        }
-       }
-      ]
-     }
-    ]
-   }
-  },
-  {
-   "id": 9,
-   "type": "barchart",
-   "title": "Daily energy",
-   "description": "Per-day totals from the inverter's daily counters",
-   "datasource": {
-    "type": "prometheus",
-    "uid": "vm"
-   },
-   "gridPos": {
-    "h": 10,
-    "w": 16,
-    "x": 0,
-    "y": 22
-   },
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "max_over_time(solis_pv_today_kwh[1d] offset -1d)",
-     "legendFormat": "Solar",
-     "refId": "A",
-     "interval": "1d"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "max_over_time(solis_load_today_kwh[1d] offset -1d)",
-     "legendFormat": "House",
-     "refId": "B",
-     "interval": "1d"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "max_over_time(solis_grid_in_today_kwh[1d] offset -1d)",
-     "legendFormat": "Import",
-     "refId": "C",
-     "interval": "1d"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "max_over_time(solis_grid_out_today_kwh[1d] offset -1d)",
-     "legendFormat": "Export",
-     "refId": "D",
-     "interval": "1d"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "max_over_time(forecast_solar_day_kwh[1d] offset -1d)",
-     "legendFormat": "Forecast",
-     "refId": "E",
-     "interval": "1d"
-    }
-   ],
-   "options": {
-    "orientation": "vertical",
-    "xField": "Time",
-    "xTickLabelRotation": 0,
-    "xTickLabelSpacing": 0,
-    "showValue": "never",
-    "stacking": "none",
-    "groupWidth": 0.8,
-    "barWidth": 0.95,
-    "barRadius": 0.05,
-    "fullHighlight": false,
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "none"
-    }
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "kwatth",
-     "custom": {
-      "fillOpacity": 85,
-      "lineWidth": 0,
-      "gradientMode": "none",
-      "axisSoftMin": 0
-     },
-     "decimals": 1
-    },
-    "overrides": [
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Solar"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "yellow"
-        }
-       }
-      ]
-     },
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "House"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "blue"
-        }
-       }
-      ]
-     },
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Import"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "red"
-        }
-       }
-      ]
-     },
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Export"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "purple"
-        }
-       }
-      ]
-     },
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Time"
-      },
-      "properties": [
-       {
-        "id": "unit",
-        "value": "time:ddd D"
-       }
-      ]
-     },
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Forecast"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "#C7C7C7"
-        }
-       },
-       {
-        "id": "custom.fillOpacity",
-        "value": 12
-       },
-       {
-        "id": "custom.lineWidth",
-        "value": 2
-       }
-      ]
-     }
-    ]
-   },
-   "interval": "1d",
-   "transformations": [
-    {
-     "id": "joinByField",
-     "options": {
-      "byField": "Time",
-      "mode": "outer"
-     }
-    }
-   ]
-  },
-  {
-   "id": 10,
-   "type": "barchart",
-   "title": "Battery per day",
-   "description": "",
-   "datasource": {
-    "type": "prometheus",
-    "uid": "vm"
-   },
-   "gridPos": {
-    "h": 10,
-    "w": 8,
-    "x": 16,
-    "y": 22
-   },
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "max_over_time(solis_batt_in_today_kwh[1d] offset -1d)",
-     "legendFormat": "Charged",
-     "refId": "A",
-     "interval": "1d"
-    },
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "vm"
-     },
-     "expr": "max_over_time(solis_batt_out_today_kwh[1d] offset -1d)",
-     "legendFormat": "Discharged",
-     "refId": "B",
-     "interval": "1d"
-    }
-   ],
-   "options": {
-    "orientation": "vertical",
-    "xField": "Time",
-    "xTickLabelRotation": 0,
-    "xTickLabelSpacing": 0,
-    "showValue": "never",
-    "stacking": "none",
-    "groupWidth": 0.8,
-    "barWidth": 0.95,
-    "barRadius": 0.05,
-    "fullHighlight": false,
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "none"
-    }
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "kwatth",
-     "custom": {
-      "fillOpacity": 85,
-      "lineWidth": 0,
-      "gradientMode": "none",
-      "axisSoftMin": 0
-     },
-     "decimals": 1
-    },
-    "overrides": [
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Charged"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "green"
-        }
-       }
-      ]
-     },
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Discharged"
-      },
-      "properties": [
-       {
-        "id": "color",
-        "value": {
-         "mode": "fixed",
-         "fixedColor": "orange"
-        }
-       }
-      ]
-     },
-     {
-      "matcher": {
-       "id": "byName",
-       "options": "Time"
-      },
-      "properties": [
-       {
-        "id": "unit",
-        "value": "time:ddd D"
-       }
-      ]
-     }
-    ]
-   },
-   "interval": "1d",
-   "transformations": [
-    {
-     "id": "joinByField",
-     "options": {
-      "byField": "Time",
-      "mode": "outer"
-     }
-    }
-   ]
-  }
- ]
 }

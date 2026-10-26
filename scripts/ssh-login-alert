@@ -1,0 +1,58 @@
+#!/bin/bash
+# ssh-login-alert - push notification for every SSH login, from PAM.
+#
+# On a home server every login should be you. An alert for each one means a stolen key or password
+# is noticed the first time it is used.
+#
+# How it works
+#   * sshd runs this through pam_exec when a session opens (PAM sets PAM_TYPE, PAM_USER, PAM_RHOST).
+#   * The notification is sent in the background with a short timeout, and the PAM line is
+#     "optional", so a slow or unreachable ntfy server can never delay or block a login.
+#   * Sources listed in SSH_ALERT_ALLOW are skipped - e.g. a machine that runs automation over SSH all
+#     day. Anything that can log in from there can then do so silently, so keep the list short.
+#
+# Install
+#   sudo install -m 755 ssh-login-alert /usr/local/sbin/
+#   sudo install -m 640 /dev/null /etc/default/ssh-login-alert     # then add the settings below
+#   echo 'session optional pam_exec.so quiet /usr/local/sbin/ssh-login-alert' | sudo tee -a /etc/pam.d/sshd
+#   Test: log in from another machine. Keep an existing session open while testing PAM changes.
+#
+# Settings (environment, or /etc/default/ssh-login-alert)
+#   NTFY_URL          ntfy topic URL (required; nothing is sent without it)
+#   SSH_ALERT_ALLOW   space-separated sources that do not alert: exact addresses, or prefixes
+#                     ending in "." or ":" (e.g. "192.0.2.50 100.64.")
+#   SSH_ALERT_NAMES   space-separated address=label pairs shown in the message; write spaces in a
+#                     label as "_" (e.g. "100.1.2.3=phone 192.0.2.20=Office_PC")
+#   SSH_ALERT_HOST    name used in the title (default: the hostname)
+
+CONFIG=${SSH_ALERT_CONFIG:-/etc/default/ssh-login-alert}
+# shellcheck source=/dev/null
+[ -r "$CONFIG" ] && . "$CONFIG"
+
+[ "${PAM_TYPE:-}" = "open_session" ] || exit 0
+[ -n "${NTFY_URL:-}" ] || exit 0
+
+source_ip=${PAM_RHOST:-local}
+for allowed in ${SSH_ALERT_ALLOW:-}; do
+  case "$allowed" in
+    *. | *:) [[ "$source_ip" == "$allowed"* ]] && exit 0 ;;
+    *) [ "$source_ip" = "$allowed" ] && exit 0 ;;
+  esac
+done
+
+label=""
+for pair in ${SSH_ALERT_NAMES:-}; do
+  name=${pair#*=}
+  [ "${pair%%=*}" = "$source_ip" ] && label=" (${name//_/ })"
+done
+
+host=${SSH_ALERT_HOST:-$(hostname)}
+message="${PAM_USER:-?} logged in from ${source_ip}${label} at $(date '+%H:%M on %a %-d %b')."
+
+# Background, detached from sshd's file descriptors, so the login never waits for the network.
+(
+  curl -fsS -m 10 -H "Title: SSH login on ${host}" -H "Priority: default" -H "Tags: key" \
+    -d "$message" "$NTFY_URL" >/dev/null 2>&1
+) </dev/null >/dev/null 2>&1 &
+
+exit 0

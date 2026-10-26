@@ -24,6 +24,8 @@ from homelab_tools.podpoint.model import charger_state
 from homelab_tools.podpoint.model import display as ev_display
 from homelab_tools.report.weekly import WeekFigures
 from homelab_tools.report.weekly import display as weekly_display
+from homelab_tools.solis.health import DayStats
+from homelab_tools.solis.health import display as solar_health_display
 from homelab_tools.solis.registers import REGISTER_BLOCKS, decode, display_fields
 from homelab_tools.tado.model import display as tado_display
 
@@ -57,6 +59,7 @@ def documented(page: str) -> str:
             "battery-check.md",
             ["overnight", "checked", *outlook_display(Outlook(datetime.now(UTC), 0, 0, 0, 0, None))],
         ),
+        ("solar-health.md", [*solar_health_display([DayStats(date(2026, 1, 1))], None, 10), "checked"]),
         ("octopus-sessions.md", [*sessions_display(Snapshot(), datetime.now(UTC)), "checked"]),
         ("tariff-compare.md", tariff_display(Comparison("x", 0, 0, 0)).keys()),
         ("host-health.md", [*host_display(None, None, [], None, Finding("memory", None)), "checked"]),

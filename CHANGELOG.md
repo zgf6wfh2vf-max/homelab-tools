@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.0
+
+* New `internet-monitor`: a broadband watch every 30 s that reports each outage when the line comes
+  back, saying whether the router stayed up (broadband fault) or not (home network); Cloudflare
+  speed tests four times a day, with an alert after three slow tests in a row; a monthly report
+  with a full list of outages and tests to send to your provider.
+* `weekly-report`: new "Systems" line covering internet outages and speed, powerline speed, battery
+  health, server problems and the last restore test.
+* New example Grafana dashboard `network.json`: internet and router timeline, latency, speed tests,
+  powerline link speed, lost MAPs and adapter status.
+
 ## 0.7.0
 
 * New `powerline-monitor`: reads devolo Magic adapters' status files for link speed in each

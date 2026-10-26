@@ -15,6 +15,8 @@ from homelab_tools.forecast.solar import Forecast
 from homelab_tools.forecast.solar import status as forecast_status
 from homelab_tools.host.health import Finding
 from homelab_tools.host.health import display as host_display
+from homelab_tools.internet.monitor import LineState, SpeedState
+from homelab_tools.internet.monitor import display as internet_display
 from homelab_tools.octopus.compare import Comparison
 from homelab_tools.octopus.compare import display as tariff_display
 from homelab_tools.octopus.pricing import DayTotals, summarise
@@ -69,6 +71,7 @@ def documented(page: str) -> str:
             "usage-watch.md",
             ["gas_day", "gas_used", "gas_expected", "gas_outside", "base_now", "base_usual", "checked"],
         ),
+        ("internet-monitor.md", [*internet_display(LineState(), SpeedState(), 0), "checked"]),
         ("powerline-monitor.md", [*powerline_display({}, PowerlineState(), []), "checked"]),
         ("restic-restore-test.md", restore_display(Report()).keys()),
         ("weekly-report.md", weekly_display(WeekFigures(date(2026, 1, 5)), None).keys()),

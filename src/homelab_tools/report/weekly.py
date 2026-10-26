@@ -6,7 +6,10 @@ optional and simply left out when its metrics are missing:
 * money - ``octopus-collector`` (import, export, gas, standing charges, off-peak share);
 * solar and battery - ``solis-monitor`` (daily counters ``solis_pv_today_kwh`` etc.);
 * car - ``podpoint-monitor`` (``ev_session_*``);
-* heating - ``tado-monitor`` (average heating demand and outside temperature).
+* heating - ``tado-monitor`` (average heating demand and outside temperature);
+* systems - ``internet-monitor`` (outages, speeds), ``powerline-monitor`` (link speed),
+  ``solar-health`` (battery state of health), plus the current ``host-health`` and restore-test
+  results read from ``$STATUS_DIR``.
 
 Octopus data arrives 1-2 days late, so run it on **Tuesday morning** for the week that ended on
 Sunday; the report says if some days' costs were still missing.
@@ -20,9 +23,11 @@ Sunday), ``--dry-run`` (print instead of sending).
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from homelab_tools.common.config import Outputs, env_str
 from homelab_tools.common.metrics import Query, vm_query
@@ -71,6 +76,16 @@ class WeekFigures:
     car_sessions: int = 0
     heating_pct: float | None = None
     outside_c: float | None = None
+    internet_checks: int = 0
+    outages: int = 0
+    outage_s: float = 0.0
+    download_mbps: float | None = None
+    upload_mbps: float | None = None
+    powerline_min_mbps: float | None = None
+    powerline_max_mbps: float | None = None
+    battery_soh_pct: float | None = None
+    server_problems: int | None = None
+    restore_test: str | None = None
 
     @property
     def electricity_p(self) -> float | None:
@@ -160,7 +175,69 @@ def collect(query: Query, start: date) -> WeekFigures:
     w.car_sessions = int(query(f"sum(count_over_time(ev_session_kwh[{window}]))", at) or 0)
     w.heating_pct = query(f"avg(avg_over_time(tado_heating_pct[{window}]))", at)
     w.outside_c = query(f"avg(avg_over_time(tado_weather_outside_c[{window}]))", at)
+    w.internet_checks = int(query(f"sum(count_over_time(internet_up[{window}]))", at) or 0)
+    w.outages = int(query(f"sum(count_over_time(internet_outage_s[{window}]))", at) or 0)
+    w.outage_s = query(f"sum(sum_over_time(internet_outage_s[{window}]))", at) or 0.0
+    w.download_mbps = query(f"quantile_over_time(0.5, internet_download_mbps[{window}])", at)
+    w.upload_mbps = query(f"quantile_over_time(0.5, internet_upload_mbps[{window}])", at)
+    w.powerline_min_mbps = query(f"min(avg_over_time(powerline_rate_mbps[{window}]))", at)
+    w.powerline_max_mbps = query(f"max(avg_over_time(powerline_rate_mbps[{window}]))", at)
+    w.battery_soh_pct = query(f"last_over_time(solis_soh[{window}])", at)
     return w
+
+
+def read_status_files(w: WeekFigures, status_dir: str) -> None:
+    """Add the current server-health and restore-test results from the tools' status files."""
+    if not status_dir:
+        return
+
+    def load(name: str) -> dict[str, str]:
+        try:
+            data: dict[str, str] = json.loads((Path(status_dir) / f"{name}.json").read_text())
+            return data
+        except (OSError, ValueError):
+            return {}
+
+    problems = load("host").get("problems")
+    if problems is not None and problems.isdigit():
+        w.server_problems = int(problems)
+    backup = load("backup")
+    if backup.get("result"):
+        w.restore_test = backup["result"] + (f" ({backup['tested']})" if backup.get("tested") else "")
+
+
+def _duration(seconds: float) -> str:
+    minutes = round(seconds / 60)
+    if minutes < 60:
+        return f"{minutes} min"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours} h {minutes} min" if minutes else f"{hours} h"
+
+
+def systems_line(w: WeekFigures) -> str | None:
+    """``"Systems: internet down twice (9 min); ..."``, or ``None`` with nothing to say."""
+    parts = []
+    if w.outages:
+        times = {1: "once", 2: "twice"}.get(w.outages, f"{w.outages} times")
+        parts.append(f"internet down {times} ({_duration(w.outage_s)} in total)")
+    elif w.internet_checks:
+        parts.append("no internet outages")
+    if w.download_mbps is not None:
+        up = f", up {w.upload_mbps:.0f}" if w.upload_mbps is not None else ""
+        parts.append(f"broadband {w.download_mbps:.0f} Mbps down{up}")
+    if w.powerline_min_mbps is not None and w.powerline_max_mbps is not None:
+        low, high = w.powerline_min_mbps, w.powerline_max_mbps
+        parts.append(
+            f"powerline {low:.0f}-{high:.0f} Mbps" if high - low >= 1 else f"powerline {low:.0f} Mbps"
+        )
+    if w.battery_soh_pct is not None:
+        parts.append(f"battery health {w.battery_soh_pct:.0f}%")
+    if w.server_problems is not None:
+        n = w.server_problems
+        parts.append("server OK" if n == 0 else f"server has {n} open problem{'s' if n != 1 else ''}")
+    if w.restore_test:
+        parts.append(f"last restore test {w.restore_test}")
+    return "Systems: " + "; ".join(parts) + "." if parts else None
 
 
 def _pounds(pence: float) -> str:
@@ -219,6 +296,9 @@ def format_report(w: WeekFigures, prev: WeekFigures | None) -> tuple[str, str]:
         usage.append(f"heating demand {w.heating_pct:.0f}%{outside}")
     if usage:
         lines.append(usage[0][0].upper() + "; ".join(usage)[1:] + ".")
+    systems = systems_line(w)
+    if systems:
+        lines.append(systems)
     title = f"Week {w.label}" + (f": {_pounds(w.net_p)}" if w.net_p is not None else "")
     return title, "\n".join(lines) if lines else "No data was recorded this week."
 
@@ -258,6 +338,15 @@ def display(w: WeekFigures, prev: WeekFigures | None) -> dict[str, str]:
         "solar_change": delta(w.solar_kwh, p.solar_kwh if p and solar_comparable else None),
         "car_change": delta(w.car_kwh, p.car_kwh if p else None),
         "gas_change": delta(w.gas_kwh, p.gas_kwh if p and octopus_comparable else None),
+        "outages": (f"{w.outages}, {_duration(w.outage_s)}" if w.outages else "none")
+        if w.internet_checks or w.outages
+        else "-",
+        "broadband": f"{w.download_mbps:.0f} / {w.upload_mbps or 0:.0f} Mbps"
+        if w.download_mbps is not None
+        else "-",
+        "powerline": f"{w.powerline_min_mbps:.0f}-{w.powerline_max_mbps:.0f} Mbps"
+        if w.powerline_min_mbps is not None and w.powerline_max_mbps is not None
+        else "-",
     }
 
 
@@ -276,6 +365,7 @@ def main() -> None:
     else:
         start, _ = last_complete_week(datetime.now().astimezone().date())
     this_week = collect(query, start)
+    read_status_files(this_week, outputs.status_dir)
     prev_week = collect(query, start - timedelta(days=7))
     title, message = format_report(this_week, prev_week)
     if args.dry_run:

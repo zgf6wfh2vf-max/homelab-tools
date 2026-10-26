@@ -1,0 +1,17 @@
+# internet-report.service - Monthly broadband report (started by internet-report.timer)
+[Unit]
+Description=Monthly broadband report
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/homelab-tools/bin/internet-monitor report
+EnvironmentFile=/etc/homelab-tools/internet-monitor.env
+User=homelab
+Group=homelab
+StateDirectory=internet-monitor
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes

@@ -1,0 +1,10 @@
+# internet-report.timer - on the 1st of each month
+[Unit]
+Description=Monthly broadband report
+
+[Timer]
+OnCalendar=*-*-01 09:15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

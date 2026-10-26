@@ -1,0 +1,11 @@
+# internet-speedtest.timer - four speed tests a day, at slightly random times
+[Unit]
+Description=Broadband speed tests
+
+[Timer]
+OnCalendar=*-*-* 02,08,14,20:30
+RandomizedDelaySec=20min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

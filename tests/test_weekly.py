@@ -138,3 +138,36 @@ def test_display_fields_and_changes() -> None:
     assert (d["solar"], d["car"], d["offpeak"], d["gas_kwh"]) == ("38 kWh", "61 kWh", "92%", "160 kWh")
     assert d["net_change"] == "▼ £2.10" and d["car_change"] == "same" and d["solar_change"] == "same"
     assert display(this, None)["net_change"] == "-"
+
+
+SYSTEMS = {
+    "count_over_time(internet_up": 20160,
+    "count_over_time(internet_outage_s": 2,
+    "sum_over_time(internet_outage_s": 540.0,
+    "internet_download_mbps": 142.4,
+    "internet_upload_mbps": 30.6,
+    "min(avg_over_time(powerline": 1144.0,
+    "max(avg_over_time(powerline": 1331.0,
+    "solis_soh": 99.0,
+}
+
+
+def test_systems_line(tmp_path) -> None:
+    from homelab_tools.report.weekly import read_status_files
+
+    (tmp_path / "host.json").write_text('{"problems": "0"}')
+    (tmp_path / "backup.json").write_text('{"result": "passed", "tested": "1 Oct 10:13"}')
+    w = collect(FakeVM(SYSTEMS), date(2026, 10, 19))
+    read_status_files(w, str(tmp_path))
+    _, message = format_report(w, None)
+    assert message == (
+        "Systems: internet down twice (9 min in total); broadband 142 Mbps down, up 31; powerline 1144-1331 "
+        "Mbps; battery health 99%; server OK; last restore test passed (1 Oct 10:13)."
+    )
+    d = display(w, None)
+    assert (d["outages"], d["broadband"], d["powerline"]) == ("2, 9 min", "142 / 31 Mbps", "1144-1331 Mbps")
+    quiet = collect(FakeVM({"count_over_time(internet_up": 100}), date(2026, 10, 19))
+    read_status_files(quiet, str(tmp_path / "missing"))
+    assert format_report(quiet, None)[1] == "Systems: no internet outages."
+    assert display(quiet, None)["outages"] == "none"
+    assert display(WeekFigures(date(2026, 10, 19)), None)["outages"] == "-"

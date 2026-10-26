@@ -2,6 +2,11 @@
 
 ## 0.3.0
 
+* New `battery-check`: a morning alert if the home battery did not charge in the cheap window, and an
+  evening heads-up when a half-hourly simulation of tomorrow (house-use profile, solar forecast
+  curve, battery reserve and losses) says the house will buy at the peak rate.
+* `solar-forecast`: saves the latest full forecast curve (`FORECAST_CURVE_FILE`) for other tools.
+* `vm_query` / `vm_range` moved to `common.metrics` for reuse.
 * New `restic-restore-test`: restores a random sample of files from the newest restic snapshot
   and checks them (size, byte-for-byte against unchanged originals, SQLite `quick_check`), with a
   monthly timer, ntfy alerts and a status file.

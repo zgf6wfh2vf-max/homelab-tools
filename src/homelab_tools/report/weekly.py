@@ -20,34 +20,16 @@ Sunday), ``--dry-run`` (print instead of sending).
 from __future__ import annotations
 
 import argparse
-import json
 import logging
-import urllib.parse
-import urllib.request
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
 from homelab_tools.common.config import Outputs, env_str
+from homelab_tools.common.metrics import Query, vm_query
 from homelab_tools.common.notify import Notifier
 from homelab_tools.common.status import write_status
 
 log = logging.getLogger("weekly-report")
-
-#: Evaluates a MetricsQL expression at a moment (epoch seconds); returns the first value or ``None``.
-Query = Callable[[str, float], float | None]
-
-
-def vm_query(vm_url: str) -> Query:
-    """A :data:`Query` backed by VictoriaMetrics' instant-query API."""
-
-    def query(expr: str, at: float) -> float | None:
-        params = urllib.parse.urlencode({"query": expr, "time": int(at)})
-        with urllib.request.urlopen(f"{vm_url}/api/v1/query?{params}", timeout=30) as resp:
-            result = json.load(resp)["data"]["result"]
-        return float(result[0]["value"][1]) if result else None
-
-    return query
 
 
 def local_midnight(day: date) -> datetime:

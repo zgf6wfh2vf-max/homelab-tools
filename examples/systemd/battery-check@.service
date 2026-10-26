@@ -1,0 +1,18 @@
+# battery-check@.service - Home battery check; the instance is the mode: battery-check@morning, battery-check@evening
+# Install: see docs/battery-check.md. Settings live in /etc/homelab-tools/battery-check.env.
+[Unit]
+Description=Home battery check (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/homelab-tools/bin/battery-check %i
+EnvironmentFile=/etc/homelab-tools/battery-check.env
+User=homelab
+Group=homelab
+ReadWritePaths=/var/lib/homelab-status
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes

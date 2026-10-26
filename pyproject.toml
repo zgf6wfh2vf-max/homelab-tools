@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "homelab-tools"
 version = "0.3.0"
-description = "Small, read-only monitors for a home lab: Octopus Energy costs, Solis inverters, FlashForge AD5X, tado, Pod Point, Pi-hole threat alerts, OpenCanary and backup restore tests - feeding ntfy, VictoriaMetrics and dashboards."
+description = "Small, read-only monitors for a home lab: Octopus Energy costs, Solis inverters, FlashForge AD5X, tado, Pod Point, Pi-hole threat alerts, OpenCanary, battery checks and backup restore tests - feeding ntfy, VictoriaMetrics and dashboards."
 readme = "README.md"
 authors = [{ name = "Rich Spokes" }]
 license = { file = "LICENSE" }
@@ -36,6 +36,7 @@ opencanary-ntfy = "homelab_tools.opencanary_ntfy.relay:main"
 solar-forecast = "homelab_tools.forecast.solar:main"
 weekly-report = "homelab_tools.report.weekly:main"
 restic-restore-test = "homelab_tools.backup.restore_test:main"
+battery-check = "homelab_tools.battery.check:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

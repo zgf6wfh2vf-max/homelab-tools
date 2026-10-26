@@ -1,0 +1,10 @@
+# battery-check-evening.timer - tomorrow's outlook, after the evening solar-forecast refresh
+[Unit]
+Description=Tomorrow's battery outlook
+
+[Timer]
+OnCalendar=*-*-* 20:15
+Unit=battery-check@evening.service
+
+[Install]
+WantedBy=timers.target

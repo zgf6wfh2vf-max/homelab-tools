@@ -11,12 +11,16 @@ arrives a day late, or backfilled history):
   ``-dedup.minScrapeInterval=1ms``; see ``docs/victoriametrics.md``.
 * Query results for past time ranges are cached, so after backdated writes
   :meth:`VictoriaMetrics.reset_cache` must be called or graphs show stale values.
+
+:func:`vm_query` and :func:`vm_range` read values back (tools that analyse other tools' metrics).
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import math
+import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
@@ -25,6 +29,11 @@ from datetime import datetime
 log = logging.getLogger(__name__)
 
 Opener = Callable[[urllib.request.Request, float], object]
+#: Evaluates a MetricsQL expression at a moment (epoch seconds); returns the first value or ``None``.
+Query = Callable[[str, float], float | None]
+#: Evaluates a MetricsQL expression from ``start`` to ``end`` every ``step`` seconds; returns the
+#: first series as ``(epoch seconds, value)`` pairs (empty if there is no data).
+RangeQuery = Callable[[str, float, float, int], list[tuple[float, float]]]
 FieldValue = float | int | bool
 
 
@@ -126,3 +135,32 @@ class VictoriaMetrics:
             self._open(urllib.request.Request(f"{self.base_url}/internal/resetRollupResultCache"), 30)
         except OSError as exc:
             log.warning("cache reset failed: %s", exc)
+
+
+def _get_json(url: str) -> dict[str, object]:
+    """GET a VictoriaMetrics API URL and decode the JSON body."""
+    with urllib.request.urlopen(url, timeout=30) as resp:
+        body: dict[str, object] = json.load(resp)
+        return body
+
+
+def vm_query(vm_url: str) -> Query:
+    """A :data:`Query` backed by VictoriaMetrics' instant-query API."""
+
+    def query(expr: str, at: float) -> float | None:
+        params = urllib.parse.urlencode({"query": expr, "time": int(at)})
+        result = _get_json(f"{vm_url}/api/v1/query?{params}")["data"]["result"]  # type: ignore[index]
+        return float(result[0]["value"][1]) if result else None
+
+    return query
+
+
+def vm_range(vm_url: str) -> RangeQuery:
+    """A :data:`RangeQuery` backed by VictoriaMetrics' range-query API."""
+
+    def query(expr: str, start: float, end: float, step: int) -> list[tuple[float, float]]:
+        params = urllib.parse.urlencode({"query": expr, "start": int(start), "end": int(end), "step": step})
+        result = _get_json(f"{vm_url}/api/v1/query_range?{params}")["data"]["result"]  # type: ignore[index]
+        return [(float(t), float(v)) for t, v in result[0]["values"]] if result else []
+
+    return query

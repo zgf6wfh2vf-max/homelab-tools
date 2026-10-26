@@ -18,6 +18,9 @@ Settings (environment):
                              90 = west, 180 = north. Example: ``35,0,6`` or ``35,-90,3;35,90,3``.
 ``ACTUAL_METRIC``            Optional metric with today's generation in kWh (e.g. ``solis_pv_today_kwh``).
 ``FORECAST_STATE_FILE``      Which day's curve was stored (default /var/lib/solar-forecast/state.json).
+``FORECAST_CURVE_FILE``      The latest full forecast (every point, today and tomorrow), rewritten each
+                             run for other tools such as ``battery-check``
+                             (default /var/lib/solar-forecast/curve.json; empty disables it).
 ``FORECAST_SOLAR_API_KEY``   Optional paid-plan key (higher limits, more planes).
 
 Metrics: ``forecast_solar_w`` (expected power, hourly points for today) and ``forecast_solar_day_kwh``
@@ -165,6 +168,33 @@ def latest_value(vm_url: str, metric: str, fetch: Fetcher | None = None) -> floa
     return float(result[0]["value"][1]) if result else None
 
 
+def save_curve(forecast: Forecast, path: Path) -> None:
+    """Atomically save every forecast point as ``{"fetched": ..., "watts": {iso time: W}}``."""
+    data = {
+        "fetched": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "watts": {t.isoformat(): w for t, w in sorted(forecast.watts.items())},
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=1))
+    tmp.replace(path)
+
+
+def load_curve(path: Path) -> tuple[datetime, dict[datetime, float]]:
+    """Read a file written by :func:`save_curve`: when it was fetched, and the power points.
+
+    Raises:
+        OSError: If the file cannot be read.
+        ValueError: If it is not a forecast curve.
+    """
+    data = json.loads(path.read_text())
+    try:
+        watts = {datetime.fromisoformat(t): float(w) for t, w in data["watts"].items()}
+        return datetime.fromisoformat(data["fetched"]), watts
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise ValueError(f"{path} is not a forecast curve file") from exc
+
+
 @dataclass
 class ForecastJob:
     """One configured forecast: where, which roof planes, and where results go.
@@ -177,6 +207,7 @@ class ForecastJob:
         status_dir: Directory for ``forecast.json``; empty disables it.
         state_file: Records the day whose curve was last stored.
         actual: Returns today's generation so far in kWh (or ``None``).
+        curve_file: Where to save the latest full forecast (see :func:`save_curve`); ``None`` disables it.
         fetch: HTTP JSON fetcher for Forecast.Solar.
         api_key: Optional paid-plan key.
     """
@@ -190,11 +221,14 @@ class ForecastJob:
     actual: Callable[[], float | None] = lambda: None
     fetch: Fetcher = http_json
     api_key: str = ""
+    curve_file: Path | None = None
 
     def run(self, today: date | None = None) -> Forecast:
         """Fetch, publish the status file, and store today's curve if not yet stored today."""
         forecast = combine(self.fetch(estimate_url(self.lat, self.lon, p, self.api_key)) for p in self.planes)
         today = today or datetime.now().astimezone().date()
+        if self.curve_file:
+            save_curve(forecast, self.curve_file)
         write_status(
             self.status_dir,
             "forecast",
@@ -231,6 +265,9 @@ def main() -> None:
         state_file=Path(env_str("FORECAST_STATE_FILE", "/var/lib/solar-forecast/state.json")),
         actual=lambda: latest_value(outputs.vm_url, actual_metric),
         api_key=env_str("FORECAST_SOLAR_API_KEY", ""),
+        curve_file=Path(curve)
+        if (curve := env_str("FORECAST_CURVE_FILE", "/var/lib/solar-forecast/curve.json"))
+        else None,
     )
     forecast = job.run()
     days = ", ".join(f"{d}: {wh / 1000:.1f} kWh" for d, wh in sorted(forecast.day_wh.items()))

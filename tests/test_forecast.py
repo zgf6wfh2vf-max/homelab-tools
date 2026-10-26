@@ -14,6 +14,7 @@ from homelab_tools.forecast.solar import (
     curve_samples,
     estimate_url,
     latest_value,
+    load_curve,
     parse_planes,
     status,
 )
@@ -131,3 +132,24 @@ def test_daily_total_lands_on_its_own_utc_day_in_summer() -> None:
         else:
             os.environ["TZ"] = old
         time.tzset()
+
+
+def test_run_saves_the_full_curve_every_time(tmp_path, http) -> None:
+    curve = tmp_path / "curve" / "curve.json"
+    job = ForecastJob(
+        51.5,
+        -0.12,
+        [Plane(35, 0, 6)],
+        VictoriaMetrics("", http),
+        "",
+        tmp_path / "state.json",
+        fetch=lambda url: response("2026-10-25"),
+        curve_file=curve,
+    )
+    job.run(today=date(2026, 10, 25))
+    fetched, watts = load_curve(curve)
+    assert fetched.tzinfo is not None and len(watts) == 12
+    assert watts[datetime(2026, 10, 26, 12, tzinfo=UTC)] == 1200  # tomorrow's points are kept too
+    curve.write_text('{"something": "else"}')
+    with pytest.raises(ValueError, match="not a forecast curve"):
+        load_curve(curve)

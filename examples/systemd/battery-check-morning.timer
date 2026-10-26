@@ -1,0 +1,10 @@
+# battery-check-morning.timer - after the cheap-rate window (00:30-05:30 on Octopus Go)
+[Unit]
+Description=Check the battery charged overnight
+
+[Timer]
+OnCalendar=*-*-* 06:15
+Unit=battery-check@morning.service
+
+[Install]
+WantedBy=timers.target

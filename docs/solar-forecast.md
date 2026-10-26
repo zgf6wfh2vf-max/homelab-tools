@@ -15,6 +15,7 @@ request per roof plane per run, so an hourly timer is comfortable.
 | `SOLAR_PLANES` | required | `tilt,azimuth,kWp` per roof plane, `;`-separated. Tilt 0 = flat, 90 = vertical. Azimuth 0 = south, -90 = east, 90 = west, 180 = north. E.g. `35,0,6` or `35,-90,3;35,90,3` |
 | `ACTUAL_METRIC` | - | Today's generation in kWh, e.g. `solis_pv_today_kwh`, shown next to the forecast |
 | `FORECAST_STATE_FILE` | `/var/lib/solar-forecast/state.json` | Which day's curve has been stored |
+| `FORECAST_CURVE_FILE` | `/var/lib/solar-forecast/curve.json` | The latest full forecast (today and tomorrow, every point), rewritten each run for [`battery-check`](battery-check.md); empty disables it |
 | `FORECAST_SOLAR_API_KEY` | - | Optional paid-plan key |
 
 Not sure of your tilt or kWp? Start with a typical pitched roof (35°) and compare the forecast with

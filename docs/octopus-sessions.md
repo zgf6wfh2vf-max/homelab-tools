@@ -53,6 +53,9 @@ half-hourly data in the API, so it's worth raising with Octopus.
 | `SESSIONS_STATE_FILE` | `/var/lib/octopus-sessions/state.json` | Events already announced, results already reported |
 | `NTFY_URL`, `STATUS_DIR` | - | Outputs (see [installation](installation.md)) |
 
+A result is reported once Octopus has finished calculating it, usually a day or two after the
+session. While it is still "calculating", `last_result` says so and no notification is sent.
+
 On the first run, existing results are recorded without notifying, so you don't get a backlog. The
 example timer runs every 30 minutes. Sessions are usually announced the day before or that morning.
 

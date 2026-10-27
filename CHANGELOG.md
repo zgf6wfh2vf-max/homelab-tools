@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1
+
+* `octopus-sessions`: a joined session's result is reported only once Octopus has finished
+  calculating it. Before, a "0 Octopoints (calculating)" message could arrive an hour after the
+  session, and the real figure never followed.
+
 ## 0.8.0
 
 * New `internet-monitor`: a broadband watch every 30 s that reports each outage when the line comes

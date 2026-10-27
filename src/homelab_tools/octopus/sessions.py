@@ -64,6 +64,9 @@ query($account: String!, $mpan: String!, $slug: String!) {
   ) { edges { node { code startAt endAt } } }
 }"""
 
+#: Result statuses that are not final yet; the result is reported once the status moves on.
+PENDING_RESULTS = ("CALCULATING", "PENDING", "IN_PROGRESS", "PROCESSING")
+
 NAMES = {"TURN_DOWN": "Power Down", "TURN_UP": "Power Up", "WEEKEND_HAPPY_HOUR": "Weekend Happy Hour"}
 
 
@@ -302,11 +305,21 @@ def process(
             state.announced.append(event.key)
             alerts.append(announce(event, now, points_per_pound))
     for outcome in sorted(snapshot.outcomes, key=lambda o: o.start):
+        if outcome.status.upper() in PENDING_RESULTS:
+            continue  # Octopus is still working it out: report the final figure later
         if outcome.key not in state.reported:
             state.reported.append(outcome.key)
             if not first_run:
                 alerts.append(result_message(outcome))
     return state, alerts
+
+
+def _result_text(outcome: Outcome) -> str:
+    if outcome.status == "MISSING_READINGS":
+        return "missing readings"
+    if outcome.status.upper() in PENDING_RESULTS:
+        return "calculating"
+    return f"{outcome.points} pts"
 
 
 def display(snapshot: Snapshot, now: datetime) -> dict[str, str]:
@@ -319,9 +332,7 @@ def display(snapshot: Snapshot, now: datetime) -> dict[str, str]:
         "next": f"{nxt.kind} {when(nxt, now)}" if nxt else "none announced",
         "reward": f"{nxt.reward_points} pts/kWh" if nxt and nxt.reward_points else "-",
         "joined": ("yes" if nxt.joined else "no") if nxt and nxt.joined is not None else "-",
-        "last_result": (f"{last.points} pts" if last.status != "MISSING_READINGS" else "missing readings")
-        if last
-        else "-",
+        "last_result": _result_text(last) if last else "-",
         "missing_90d": f"{sum(o.status == 'MISSING_READINGS' for o in recent)} of {len(recent)}",
         "points": str(snapshot.points_balance) if snapshot.points_balance is not None else "-",
     }

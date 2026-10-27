@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "homelab-tools"
-version = "0.8.0"
+version = "0.8.1"
 description = "Small, read-only monitors for a home lab: Octopus Energy costs, Solis inverters, FlashForge AD5X, tado, Pod Point, Pi-hole threat alerts, OpenCanary, battery, tariff, usage server health, powerline and broadband checks, and backup restore tests - feeding ntfy, VictoriaMetrics and dashboards."
 readme = "README.md"
 authors = [{ name = "Rich Spokes" }]

@@ -175,3 +175,23 @@ def test_display() -> None:
         "missing_90d": "1 of 1",
         "points": "7",
     }
+
+
+def test_results_still_being_calculated_wait_for_the_final_figure() -> None:
+    calculating = {
+        "eventId": 7600, "startAt": "2026-10-26T18:00:00+00:00", "endAt": "2026-10-26T19:00:00+00:00",
+        "eventType": "TURN_DOWN", "eventStatus": "DONE", "resultsStatus": "CALCULATING",
+        "rewardGivenInOctoPoints": 0,
+    }  # fmt: skip
+    sessions = SESSIONS | {"account": SESSIONS["account"] | {"joinedEvents": [calculating]}}
+    later = datetime(2026, 10, 26, 19, 30, tzinfo=UTC)
+    snap = flex(FakeAPI(sessions)).snapshot(["TURN_DOWN"], [], later)
+    state = State(announced=[], reported=[])
+    state, alerts = process(snap, state, later)
+    assert not [a for a in alerts if a[0].endswith("result")] and "session:7600" not in state.reported
+    assert display(snap, later)["last_result"] == "calculating"
+    final = calculating | {"resultsStatus": "COMPLETED", "rewardGivenInOctoPoints": 240}
+    sessions = SESSIONS | {"account": SESSIONS["account"] | {"joinedEvents": [final]}}
+    snap = flex(FakeAPI(sessions)).snapshot(["TURN_DOWN"], [], later)
+    _, alerts = process(snap, state, later)
+    assert ("Power Down result", "Power Down on Mon 26 Oct: 240 Octopoints (completed).", "low") in alerts

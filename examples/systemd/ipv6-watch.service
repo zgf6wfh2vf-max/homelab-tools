@@ -1,0 +1,22 @@
+# ipv6-watch.service - Alert when a router starts announcing IPv6 or its own DNS server
+# Install: see docs/ipv6-watch.md. Settings live in /etc/homelab-tools/ipv6-watch.env.
+[Unit]
+Description=IPv6 router advertisement watch
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/homelab-tools/bin/ipv6-watch
+EnvironmentFile=/etc/homelab-tools/ipv6-watch.env
+User=homelab
+Group=homelab
+# rdisc6 needs a raw socket; NoNewPrivileges stops its setuid bit, so grant only that capability.
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+StateDirectory=ipv6-watch
+ReadWritePaths=/var/lib/homelab-status
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes

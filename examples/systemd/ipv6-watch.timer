@@ -1,0 +1,10 @@
+# ipv6-watch.timer - every five minutes
+[Unit]
+Description=IPv6 router advertisement checks
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

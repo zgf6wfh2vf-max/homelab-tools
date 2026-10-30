@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0
+
+* New `ipv6-watch`: alerts when a router starts announcing IPv6 or a DNS server other than yours.
+  Phones then bypass Pi-hole, and local names open the router's page. ISP routers often turn IPv6
+  back on after a restart or firmware update.
+
 ## 0.8.1
 
 * `octopus-sessions`: a joined session's result is reported only once Octopus has finished

@@ -5,6 +5,7 @@ import threading
 import time as systime
 from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -38,7 +39,7 @@ def london():
     systime.tzset()
 
 
-T0 = datetime(2026, 10, 12, 14, 0).timestamp()
+T0 = datetime(2026, 10, 12, 14, 0, tzinfo=ZoneInfo("Europe/London")).timestamp()  # not the runner's zone
 
 
 @pytest.mark.parametrize(

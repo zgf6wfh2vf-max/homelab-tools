@@ -465,7 +465,7 @@
      "custom": {
       "lineWidth": 1,
       "fillOpacity": 10,
-      "showPoints": "never",
+      "showPoints": "auto",
       "spanNulls": 900000,
       "thresholdsStyle": {
        "mode": "dashed"
@@ -536,7 +536,7 @@
      "custom": {
       "lineWidth": 1,
       "fillOpacity": 10,
-      "showPoints": "never",
+      "showPoints": "auto",
       "spanNulls": 900000
      },
      "min": 0
@@ -586,7 +586,7 @@
      "custom": {
       "lineWidth": 1,
       "fillOpacity": 10,
-      "showPoints": "never",
+      "showPoints": "auto",
       "spanNulls": 900000
      },
      "min": 0,
@@ -637,7 +637,7 @@
      "custom": {
       "lineWidth": 1,
       "fillOpacity": 10,
-      "showPoints": "never",
+      "showPoints": "auto",
       "spanNulls": 900000
      },
      "min": 0

@@ -13,7 +13,7 @@
   "to": "now"
  },
  "schemaVersion": 39,
- "version": 9,
+ "version": 10,
  "description": "Small transparent panels for embedding in a dashboard (e.g. Homepage iframe widgets).",
  "panels": [
   {
@@ -531,7 +531,7 @@
       "uid": "vm"
      },
      "expr": "solis_inv_temp_c",
-     "legendFormat": "Inverter \u00b0C",
+     "legendFormat": "Inverter °C",
      "refId": "A"
     },
     {
@@ -570,7 +570,7 @@
      {
       "matcher": {
        "id": "byName",
-       "options": "Inverter \u00b0C"
+       "options": "Inverter °C"
       },
       "properties": [
        {
@@ -616,7 +616,7 @@
      {
       "matcher": {
        "id": "byName",
-       "options": "Inverter \u00b0C"
+       "options": "Inverter °C"
       },
       "properties": [
        {
@@ -1164,6 +1164,85 @@
       ]
      }
     ]
+   }
+  },
+  {
+   "id": 9,
+   "type": "timeseries",
+   "title": "",
+   "description": "",
+   "transparent": true,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 24,
+    "x": 0,
+    "y": 32
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "host_cpu_temp_c",
+     "legendFormat": "{{host}} CPU",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "none"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "celsius",
+     "decimals": 1,
+     "min": 30,
+     "max": 90,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     },
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "orange"
+     },
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 8,
+      "showPoints": "auto",
+      "spanNulls": 900000,
+      "gradientMode": "opacity",
+      "thresholdsStyle": {
+       "mode": "dashed"
+      }
+     }
+    },
+    "overrides": []
    }
   }
  ]

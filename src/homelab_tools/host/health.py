@@ -25,7 +25,7 @@ The Raspberry Pi checks use ``vcgencmd`` and are skipped where it is missing; ru
 ``/sys`` and ``systemctl``, so no root access is needed.
 
 Settings (environment): ``NTFY_URL``, ``STATUS_DIR``, ``HEALTH_STATE_FILE`` and the thresholds in
-``docs/host-health.md``.
+``docs/host-health.md``; ``VM_URL`` to record temperature, fan speed and the other readings.
 """
 
 from __future__ import annotations
@@ -43,6 +43,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from homelab_tools.common.config import Outputs, env_float, env_str
+from homelab_tools.common.metrics import Sample, VictoriaMetrics
 from homelab_tools.common.notify import Notifier
 from homelab_tools.common.status import write_status
 
@@ -92,6 +93,15 @@ def run(cmd: Sequence[str]) -> str | None:
     return proc.stdout if proc.returncode == 0 else None
 
 
+def read_fan_rpm() -> int | None:
+    """Speed of the first fan the kernel reports (a Pi 5 active cooler shows up here), if any."""
+    for path in sorted(Path("/sys/class/hwmon").glob("hwmon*/fan1_input")):
+        text = read_text(str(path))
+        if text and text.strip().isdigit():
+            return int(text)
+    return None
+
+
 @dataclass
 class System:
     """Where the checks get their facts; every field can be replaced in tests."""
@@ -106,6 +116,7 @@ class System:
         sorted(p.name for p in Path("/lib/modules").iterdir()) if Path("/lib/modules").is_dir() else []
     )
     running_kernel: Callable[[], str] = lambda: os.uname().release
+    fan_rpm: Callable[[], int | None] = read_fan_rpm
 
 
 # --- checks ------------------------------------------------------------------------------------------
@@ -170,11 +181,17 @@ def check_units(system: System) -> list[Finding]:
     return [Finding(f"unit:{u}", f"{u} has failed", 10 * MINUTE, f"{u} failed") for u in units]
 
 
-def check_memory(system: System, warn_pct: float) -> Finding:
-    """Too little memory available?"""
+def memory_available_pct(system: System) -> float | None:
+    """Percentage of memory available, from ``/proc/meminfo``."""
     info = dict(re.findall(r"^(\w+):\s+(\d+)", system.read("/proc/meminfo") or "", re.M))
     total, available = int(info.get("MemTotal", 0)), int(info.get("MemAvailable", 0))
-    pct = 100 * available / total if total else 100.0
+    return 100 * available / total if total else None
+
+
+def check_memory(system: System, warn_pct: float) -> Finding:
+    """Too little memory available?"""
+    pct = memory_available_pct(system)
+    pct = 100.0 if pct is None else pct
     problem = f"only {pct:.0f}% of memory available" if pct < warn_pct else None
     return Finding("memory", problem, 15 * MINUTE, "low memory")
 
@@ -360,8 +377,8 @@ class Settings:
 
 def check_all(
     system: System, settings: Settings, state: State, now: float
-) -> tuple[list[Finding], dict[str, str]]:
-    """Run every check, updating the reboot-scoped parts of ``state``; returns findings and status."""
+) -> tuple[list[Finding], dict[str, str], Sample]:
+    """Run every check, updating the reboot-scoped parts of ``state``; returns findings, status, metrics."""
     boot_id = (system.read("/proc/sys/kernel/random/boot_id") or "").strip()
     if boot_id != state.boot_id:
         state.boot_id, state.throttle_seen, state.write_samples = boot_id, 0, []
@@ -384,7 +401,20 @@ def check_all(
         state.write_samples = [s for s in state.write_samples if now - s[0] <= 26 * 3600]
         findings.append(check_writes(gb, settings.write_warn_gb, settings.write_device))
     findings.append(check_reboot(system))
-    return findings, display(temp, bits, findings, gb, memory)
+    readings = Sample(
+        "host",
+        {
+            "cpu_temp_c": temp,
+            "fan_rpm": system.fan_rpm(),
+            "throttled": None if bits is None else bool(bits & (THROTTLED_NOW | SOFT_LIMIT_NOW)),
+            "undervolt": None if bits is None else bool(bits & UNDERVOLT_NOW),
+            "mem_available_pct": memory_available_pct(system),
+            "writes_gb_24h": gb,
+            "failed_units": sum(1 for f in findings if f.key.startswith("unit:")),
+            "problems": sum(1 for f in findings if f.problem),
+        },
+    )
+    return findings, display(temp, bits, findings, gb, memory), readings
 
 
 def main() -> None:
@@ -394,12 +424,13 @@ def main() -> None:
     state_file = Path(env_str("HEALTH_STATE_FILE", "/var/lib/host-health/state.json"))
     state = State.load(state_file)
     now = time.time()
-    findings, status = check_all(System(), Settings.from_env(), state, now)
+    findings, status, readings = check_all(System(), Settings.from_env(), state, now)
     host = socket.gethostname()
     notifier = Notifier(outputs.ntfy_url)
     for title, message, priority in evaluate(findings, state, now, host):
         log.info("%s: %s", title, message)
         notifier.send(title, message, priority=priority, tags="warning" if priority == "high" else "")
+    VictoriaMetrics(outputs.vm_url).write([Sample(readings.measurement, readings.fields, {"host": host})])
     state.save(state_file)
     write_status(outputs.status_dir, "host", status | {"checked": time.strftime("%H:%M")})
 

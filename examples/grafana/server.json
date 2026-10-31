@@ -1,0 +1,649 @@
+{
+ "uid": "server",
+ "title": "Server",
+ "tags": [
+  "host-health"
+ ],
+ "timezone": "browser",
+ "editable": true,
+ "refresh": "1m",
+ "time": {
+  "from": "now-7d",
+  "to": "now"
+ },
+ "schemaVersion": 39,
+ "version": 1,
+ "templating": {
+  "list": [
+   {
+    "name": "host",
+    "label": "Host",
+    "type": "query",
+    "datasource": {
+     "type": "prometheus",
+     "uid": "vm"
+    },
+    "query": {
+     "query": "label_values(host_cpu_temp_c, host)",
+     "refId": "host"
+    },
+    "definition": "label_values(host_cpu_temp_c, host)",
+    "refresh": 2,
+    "includeAll": true,
+    "multi": true,
+    "current": {
+     "text": "All",
+     "value": "$__all"
+    }
+   }
+  ]
+ },
+ "panels": [
+  {
+   "id": 1,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "type": "stat",
+   "title": "CPU temperature",
+   "description": "Now",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 0,
+    "y": 0
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "last_over_time(host_cpu_temp_c{host=~\"$host\"}[15m])",
+     "legendFormat": "CPU temperature",
+     "refId": "A",
+     "instant": true
+    }
+   ],
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "celsius",
+     "decimals": 1,
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     }
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 2,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "type": "stat",
+   "title": "Hottest, 7 days",
+   "description": "Highest 5-minute reading over the last week",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 4,
+    "y": 0
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "max_over_time(host_cpu_temp_c{host=~\"$host\"}[7d])",
+     "legendFormat": "Hottest, 7 days",
+     "refId": "A",
+     "instant": true
+    }
+   ],
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "celsius",
+     "decimals": 1,
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     }
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 3,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "type": "stat",
+   "title": "Fan",
+   "description": "Active cooler speed",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 8,
+    "y": 0
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "last_over_time(host_fan_rpm{host=~\"$host\"}[15m])",
+     "legendFormat": "Fan",
+     "refId": "A",
+     "instant": true
+    }
+   ],
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "rotrpm",
+     "decimals": 0,
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "text",
+        "value": null
+       }
+      ]
+     }
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 4,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "type": "stat",
+   "title": "Throttled now",
+   "description": "CPU slowed for heat",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 12,
+    "y": 0
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "last_over_time(host_throttled{host=~\"$host\"}[15m])",
+     "legendFormat": "Throttled now",
+     "refId": "A",
+     "instant": true
+    }
+   ],
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "decimals": 0,
+     "mappings": [
+      {
+       "type": "value",
+       "options": {
+        "0": {
+         "text": "No",
+         "color": "green"
+        },
+        "1": {
+         "text": "Yes",
+         "color": "red"
+        }
+       }
+      }
+     ],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "text",
+        "value": null
+       }
+      ]
+     }
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 5,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "type": "stat",
+   "title": "Memory available",
+   "description": "",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 16,
+    "y": 0
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "last_over_time(host_mem_available_pct{host=~\"$host\"}[15m])",
+     "legendFormat": "Memory available",
+     "refId": "A",
+     "instant": true
+    }
+   ],
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "decimals": 0,
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 10
+       },
+       {
+        "color": "green",
+        "value": 20
+       }
+      ]
+     }
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 6,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "type": "stat",
+   "title": "Problems",
+   "description": "host-health checks with a problem now",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 20,
+    "y": 0
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "last_over_time(host_problems{host=~\"$host\"}[15m])",
+     "legendFormat": "Problems",
+     "refId": "A",
+     "instant": true
+    }
+   ],
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "decimals": 0,
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 7,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "type": "timeseries",
+   "title": "CPU temperature",
+   "description": "A Pi 5's fan speeds up from about 60 °C; it starts slowing itself at 80-85 °C. host-health alerts at TEMP_WARN_C (default 80 °C).",
+   "gridPos": {
+    "h": 9,
+    "w": 16,
+    "x": 0,
+    "y": 4
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "host_cpu_temp_c{host=~\"$host\"}",
+     "legendFormat": "{{host}}",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "legend": {
+     "showLegend": false,
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "celsius",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": 900000,
+      "thresholdsStyle": {
+       "mode": "dashed"
+      }
+     },
+     "min": 30,
+     "max": 90,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70
+       },
+       {
+        "color": "red",
+        "value": 80
+       }
+      ]
+     }
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 8,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "type": "timeseries",
+   "title": "Fan speed",
+   "description": "",
+   "gridPos": {
+    "h": 9,
+    "w": 8,
+    "x": 16,
+    "y": 4
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "host_fan_rpm{host=~\"$host\"}",
+     "legendFormat": "{{host}}",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "legend": {
+     "showLegend": false,
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "rotrpm",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": 900000
+     },
+     "min": 0
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 9,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "type": "timeseries",
+   "title": "Memory available",
+   "description": "",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 13
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "host_mem_available_pct{host=~\"$host\"}",
+     "legendFormat": "{{host}}",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "legend": {
+     "showLegend": false,
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": 900000
+     },
+     "min": 0,
+     "max": 100
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 10,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "type": "timeseries",
+   "title": "Disk writes, last 24 hours",
+   "description": "Written to WRITE_DEVICE (the SD card) in the previous 24 hours",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 13
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "host_writes_gb_24h{host=~\"$host\"}",
+     "legendFormat": "{{host}}",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "legend": {
+     "showLegend": false,
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "decgbytes",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": 900000
+     },
+     "min": 0
+    },
+    "overrides": []
+   }
+  }
+ ]
+}

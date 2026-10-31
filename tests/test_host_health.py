@@ -50,11 +50,12 @@ def fake_system(
         disk_usage=lambda path: (int(used_pct), 100),
         kernels=lambda: list(kernels),
         running_kernel=lambda: running,
+        fan_rpm=lambda: 3200,
     )
 
 
 def run_checks(system: System, state: State, now: float, **settings) -> tuple[list, dict]:
-    findings, status = check_all(system, Settings(**settings), state, now)
+    findings, status, _ = check_all(system, Settings(**settings), state, now)
     return evaluate(findings, state, now, "ajax"), status
 
 
@@ -171,3 +172,11 @@ def test_state_round_trip(tmp_path: Path) -> None:
     state.save(tmp_path / "s.json")
     assert State.load(tmp_path / "s.json") == state
     assert State.load(tmp_path / "missing.json") == State()
+
+
+def test_readings_for_metrics() -> None:
+    _, _, readings = check_all(fake_system(temp=57125, throttled="throttled=0x50000"), Settings(), State(), 0)
+    assert readings.to_line() == (
+        "host cpu_temp_c=57.125,fan_rpm=3200,throttled=0,undervolt=0,mem_available_pct=75.0,"
+        "failed_units=0,problems=1"
+    )  # throttling since boot (0x50000) is a power-blip problem, but not throttling now

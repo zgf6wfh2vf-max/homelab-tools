@@ -39,12 +39,17 @@ compares the running kernel with the newest installed kernel of the same flavour
 | `WRITE_DEVICE` | `mmcblk0` | Block device for the write check (the SD card on a Pi) |
 | `WRITE_WARN_GB` | 20 | Daily writes alert |
 | `HEALTH_STATE_FILE` | `/var/lib/host-health/state.json` | Open problems, write samples |
-| `NTFY_URL`, `STATUS_DIR` | - | Outputs (see [installation](installation.md)) |
+| `NTFY_URL`, `VM_URL`, `STATUS_DIR` | - | Outputs (see [installation](installation.md)) |
 
 It needs no root access. The Raspberry Pi checks call `vcgencmd`, which needs the `video` group
 (`SupplementaryGroups=video` in the example unit), and are skipped on other machines.
 
 ## Outputs
+
+**Metrics** (label `host`, the machine's hostname): `host_cpu_temp_c`, `host_fan_rpm` (the
+first fan the kernel reports, such as a Pi 5 active cooler), `host_throttled` and `host_undervolt`
+(happening now; Raspberry Pi only), `host_mem_available_pct`, `host_writes_gb_24h`,
+`host_failed_units` and `host_problems`. The [`server.json`](dashboards.md) Grafana dashboard graphs them.
 
 **Status** (`host.json`): `cpu_temp`, `power`, `failed_units`, `memory`, `writes_24h`, `reboot`,
 `problems` (how many checks currently have a problem), `checked`.

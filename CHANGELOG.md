@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0
+
+* `host-health` records its readings in VictoriaMetrics (when `VM_URL` is set): CPU temperature,
+  fan speed, throttling, under-voltage, memory, SD-card writes, failed units and open problems.
+* New example Grafana dashboard `server.json` graphing them.
+
 ## 0.9.0
 
 * New `ipv6-watch`: alerts when a router starts announcing IPv6 or a DNS server other than yours.

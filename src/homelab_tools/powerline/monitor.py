@@ -17,11 +17,17 @@ Check                   Problem when                                            
 
 Restarts (uptime went backwards) and firmware changes are reported once, at low priority.
 
+An adapter only re-measures a direction while traffic flows that way, so a quiet link can show a
+stale figure for hours. Before judging a link slow, and while a slow-link problem is open, the tool
+pushes traffic across (at most every ``PLC_REFRESH_MIN`` minutes) and reads the adapters again: a
+burst of UDP to each adapter (one of them is across the mains) and, if ``PLC_REFRESH_URL`` is set, a
+download that comes in over the powerline (e.g. a speed-test file, when the router is on the far side).
+
 The data file also contains the adapters' internal API tokens; only the fields listed in
 :data:`FIELDS` are kept, and nothing else is logged or stored.
 
 Settings (environment): ``PLC_HOSTS``, ``PLC_RATE_SCALE``, ``PLC_DROP_PCT``, ``PLC_STATE_FILE``,
-``NTFY_URL``, ``VM_URL``, ``STATUS_DIR``.
+``PLC_REFRESH_MB``, ``PLC_REFRESH_URL``, ``PLC_REFRESH_MIN``, ``NTFY_URL``, ``VM_URL``, ``STATUS_DIR``.
 """
 
 from __future__ import annotations
@@ -30,6 +36,7 @@ import gzip
 import json
 import logging
 import re
+import socket
 import statistics
 import time
 import urllib.request
@@ -37,7 +44,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from homelab_tools.common.config import Outputs, env_float, env_str
+from homelab_tools.common.config import Outputs, env_float, env_int, env_str
 from homelab_tools.common.metrics import Sample, VictoriaMetrics
 from homelab_tools.common.notify import Notifier
 from homelab_tools.common.status import write_status
@@ -49,6 +56,7 @@ DAY = 86400.0
 #: Mbps in the devolo app per raw rate unit, measured on a Magic 2 LAN pair (1315 app / 24657 raw).
 DEFAULT_SCALE = 0.0533
 HISTORY_DAYS = 7
+USER_AGENT = "homelab-tools powerline-monitor"
 HISTORY_EVERY = 30 * MINUTE  # one stored sample per link per half hour
 MIN_HISTORY = 24  # half a day of samples before "slower than usual" is judged
 
@@ -69,6 +77,8 @@ FIELDS = (
 
 #: Fetches an adapter's data file (raw bytes); raises ``OSError`` when it does not answer.
 Fetch = Callable[[str], bytes]
+#: Pushes traffic across the powerline so the adapters re-measure their links.
+Refresh = Callable[[], None]
 
 
 def http_fetch(host: str) -> bytes:
@@ -76,6 +86,41 @@ def http_fetch(host: str) -> bytes:
     with urllib.request.urlopen(f"http://{host}/assets/data.cfl", timeout=10) as resp:
         body: bytes = resp.read()
         return body
+
+
+def udp_burst(hosts: Iterable[str], megabytes: float, port: int = 9) -> None:
+    """Send ``megabytes`` of UDP to each host's discard port; the adapters ignore it."""
+    payload = bytes(1400)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        for host in hosts:
+            for _ in range(int(megabytes * 1e6 / len(payload))):
+                try:
+                    sock.sendto(payload, (host, port))
+                except OSError:  # a full send buffer or unreachable host; the burst is best-effort
+                    time.sleep(0.001)
+
+
+def download(url: str) -> None:
+    """Read ``url`` to the end and discard it (with a named User-Agent: some sites refuse urllib's)."""
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=30) as resp:
+        while resp.read(1 << 16):
+            pass
+
+
+def make_refresh(hosts: Sequence[str], megabytes: float, url: str) -> Refresh:
+    """The default refresh: a UDP burst to every adapter, then the download if one is set."""
+
+    def refresh() -> None:
+        udp_burst(hosts, megabytes)
+        if url:
+            try:
+                download(url)
+            except OSError as exc:
+                log.warning("refresh download failed: %s", exc)
+        time.sleep(5)  # give the adapters a moment to update their figures
+
+    return refresh
 
 
 def parse(raw: bytes) -> dict[str, str]:
@@ -183,6 +228,7 @@ class State:
         uptime: Last uptime of each address, to spot restarts.
         firmware: Last firmware of each address, to spot updates.
         history: Half-hourly ``(time, Mbps)`` samples for each ``from>to`` link, last 7 days.
+        last_refresh: When traffic was last pushed across to refresh the figures (epoch seconds).
     """
 
     since: dict[str, float] = field(default_factory=dict)
@@ -191,6 +237,7 @@ class State:
     uptime: dict[str, int] = field(default_factory=dict)
     firmware: dict[str, str] = field(default_factory=dict)
     history: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
+    last_refresh: float = 0.0
 
     @classmethod
     def load(cls, path: Path) -> State:
@@ -402,11 +449,36 @@ def display(adapters: dict[str, Adapter | None], state: State, findings: Sequenc
     }
 
 
+def looks_slow(adapters: dict[str, Adapter | None], state: State, drop_pct: float) -> bool:
+    """Is a link below its threshold now, or a slow-link problem still open?"""
+    for link, rate in current_links(adapters).items():
+        usual = state.usual(link)
+        if usual is not None and rate < usual * drop_pct / 100:
+            return True
+    return any(k.startswith("slow:") for k in state.alerted)
+
+
 def run(
-    hosts: Sequence[str], fetch: Fetch, state: State, now: float, scale: float, drop_pct: float
+    hosts: Sequence[str],
+    fetch: Fetch,
+    state: State,
+    now: float,
+    scale: float,
+    drop_pct: float,
+    refresh: Refresh | None = None,
+    refresh_every: float = 15 * MINUTE,
 ) -> tuple[list[Alert], dict[str, Adapter | None], list[Finding]]:
-    """One pass: poll, check, alert, and record history (after judging, so a drop isn't its own norm)."""
+    """One pass: poll, check, alert, and record history (after judging, so a drop isn't its own norm).
+
+    When a link looks slow, ``refresh`` pushes traffic across and the adapters are read again, so the
+    verdict is not based on a figure left over from the last time the link was busy.
+    """
     adapters = poll(hosts, fetch, scale)
+    if refresh and now - state.last_refresh >= refresh_every and looks_slow(adapters, state, drop_pct):
+        log.info("a link looks slow; pushing traffic across and reading again")
+        refresh()
+        state.last_refresh = now
+        adapters = poll(hosts, fetch, scale)
     findings, events = check(adapters, state, drop_pct)
     alerts = events + evaluate(findings, state, now)
     record_history(state, current_links(adapters), now)
@@ -420,6 +492,7 @@ def main() -> None:
     hosts = env_str("PLC_HOSTS").split()
     state_file = Path(env_str("PLC_STATE_FILE", "/var/lib/powerline-monitor/state.json"))
     state = State.load(state_file)
+    megabytes = env_float("PLC_REFRESH_MB", 20.0)
     alerts, adapters, findings = run(
         hosts,
         http_fetch,
@@ -427,6 +500,8 @@ def main() -> None:
         time.time(),
         env_float("PLC_RATE_SCALE", DEFAULT_SCALE),
         env_float("PLC_DROP_PCT", 50.0),
+        make_refresh(hosts, megabytes, env_str("PLC_REFRESH_URL", "")) if megabytes > 0 else None,
+        env_int("PLC_REFRESH_MIN", 15) * MINUTE,
     )
     notifier = Notifier(outputs.ntfy_url)
     for title, message, priority in alerts:

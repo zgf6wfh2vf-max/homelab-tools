@@ -154,3 +154,39 @@ def test_metrics_and_display() -> None:
         "lost_maps": "Lounge 992",
         "problems": "1",
     }
+
+
+def test_a_stale_slow_figure_is_refreshed_before_alerting() -> None:
+    net, state, t = Network(), State(), 1_000_000.0
+    for i in range(24):
+        run([MASTER, OFFICE], net, state, t + i * 1800, 0.0533, 50)
+    t += 24 * 1800
+    net.to_office = 9000  # the figure left over from the last busy moment
+    refreshes = []
+
+    def refresh() -> None:  # traffic flows, and the adapter re-measures
+        refreshes.append(1)
+        net.to_office = 24657
+
+    for step in range(8):  # 40 min: without the refresh this would alert after 30
+        assert run([MASTER, OFFICE], net, state, t + step * 300, 0.0533, 50, refresh)[0] == []
+        net.to_office = 9000  # and goes stale again
+    assert len(refreshes) == 3  # at most every 15 minutes
+
+
+def test_a_real_slowdown_still_alerts_and_clears_after_a_refresh() -> None:
+    net, state, t = Network(), State(), 1_000_000.0
+    for i in range(24):
+        run([MASTER, OFFICE], net, state, t + i * 1800, 0.0533, 50)
+    t += 24 * 1800
+    net.to_office = 9000
+    refreshes = []
+    run([MASTER, OFFICE], net, state, t, 0.0533, 50, lambda: refreshes.append(1))
+    alerts = run([MASTER, OFFICE], net, state, t + 1800, 0.0533, 50, lambda: refreshes.append(1))[0]
+    assert [a[0] for a in alerts] == ["Powerline problem"] and len(refreshes) == 2
+
+    def recovers() -> None:
+        net.to_office = 24657
+
+    alerts = run([MASTER, OFFICE], net, state, t + 2700, 0.0533, 50, recovers)[0]
+    assert [a[0] for a in alerts] == ["Powerline: OK again"]

@@ -28,6 +28,20 @@ direction of a link is measured at its far end. The raw figure is in an undocume
 24657. To calibrate yours, divide the app's figure by `ACTUAL_RX_BPS` in the data file. These are
 link rates (what the wiring can carry), not traffic, so they don't rise and fall with use.
 
+**Stale figures:** an adapter only re-measures a direction while traffic flows that way. A link
+that's quiet in one direction (a server that mostly receives, say) can keep showing the figure from
+its last busy moment for hours. So before it judges a link slow, and while a slow-link problem is
+open, the tool pushes traffic across and reads the adapters again, at most every `PLC_REFRESH_MIN`
+minutes:
+
+* a burst of `PLC_REFRESH_MB` MB of UDP to each adapter's discard port, which the adapters ignore.
+  The copy sent to the adapter on the far side has to cross the mains, which covers the direction
+  away from the machine running the tool;
+* a download of `PLC_REFRESH_URL`, if set, for the direction towards it. It needs to come in over
+  the powerline, so it can be a file from the internet when the router is on the far side.
+
+This normally happens only while something already looks wrong. Set `PLC_REFRESH_MB=0` to turn it off.
+
 **Lost MAPs** is a running count of scheduling messages from the master adapter that an adapter
 missed. It's recorded but not alerted on. An adapter whose count climbs much faster than the others
 is on a noisier socket.
@@ -44,6 +58,9 @@ tool doesn't log in yet, so it would then need that support adding.
 | `PLC_HOSTS` | (required) | Space-separated adapter addresses (reserve them in your DHCP server) |
 | `PLC_RATE_SCALE` | 0.0533 | App Mbps per raw rate unit (see above) |
 | `PLC_DROP_PCT` | 50 | Slow-link alert, as a percentage of the usual rate |
+| `PLC_REFRESH_MB` | 20 | UDP sent to each adapter to refresh a slow-looking figure (0: never refresh) |
+| `PLC_REFRESH_URL` | (none) | A download that crosses the powerline towards this machine, e.g. `https://speed.cloudflare.com/__down?bytes=25000000` |
+| `PLC_REFRESH_MIN` | 15 | Minimum minutes between refreshes |
 | `PLC_STATE_FILE` | `/var/lib/powerline-monitor/state.json` | Names, uptimes, firmware, open problems, a week of rates |
 | `NTFY_URL`, `VM_URL`, `STATUS_DIR` | - | Outputs (see [installation](installation.md)) |
 

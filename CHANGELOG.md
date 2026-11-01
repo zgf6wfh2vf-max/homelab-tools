@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0
+
+* `powerline-monitor`: before calling a link slow, and while a slow-link problem is open, it pushes
+  traffic across and reads the adapters again. An adapter only re-measures a direction while
+  traffic flows, so a quiet link could keep a stale low figure (and an open alert) for hours.
+
 ## 0.10.0
 
 * `host-health` records its readings in VictoriaMetrics (when `VM_URL` is set): CPU temperature,

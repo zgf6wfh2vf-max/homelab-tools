@@ -2,6 +2,11 @@
 
 ## 0.11.0
 
+* `weekly-report` and `usage-watch`: dashboard fields say why they're empty: "part week" or
+  "first week" for a change with nothing comparable, and "learning" with the start date for the
+  always-on electricity check.
+* `usage-watch`: the gas fields in `usage.json` no longer vanish on a run with no new gas day to
+  check; the last result is kept in the state file.
 * `powerline-monitor`: before calling a link slow, and while a slow-link problem is open, it pushes
   traffic across and reads the adapters again. An adapter only re-measures a direction while
   traffic flows, so a quiet link could keep a stale low figure (and an open alert) for hours.

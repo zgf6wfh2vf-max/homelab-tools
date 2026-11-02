@@ -60,4 +60,5 @@ Usage: `usage-watch` (meant for a daily timer after `octopus-collector` has run)
 ## Outputs
 
 **Status** (`usage.json`): `gas_day`, `gas_used`, `gas_expected`, `gas_outside` (the newest gas day
-checked), `base_now`, `base_usual` (baseload in W) and `checked`.
+checked), `base_now`, `base_usual` (baseload in W; until there are 9 complete days of
+history, "learning" and the date it starts, e.g. "from Wed 4 Nov") and `checked`.

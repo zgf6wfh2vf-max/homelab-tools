@@ -138,10 +138,11 @@ def test_watch_first_run_checks_only_the_newest_day_then_continues(tmp_path: Pat
     assert state.gas_checked == last.isoformat() and status["base_now"] == "150 W"
     state.save(tmp_path / "state.json")
     assert State.load(tmp_path / "state.json") == state
-    again, _ = make_watch(gas, temps, rows, state).run(
+    again, again_status = make_watch(gas, temps, rows, state).run(
         datetime.combine(last + timedelta(days=2), time(11)).astimezone()
     )
     assert again == []  # already checked
+    assert status["gas_day"] == f"{last:%a %-d %b}" and again_status["gas_day"] == status["gas_day"]
 
 
 def test_watch_baseload_alerts_once_and_on_recovery() -> None:
@@ -159,3 +160,14 @@ def test_watch_baseload_alerts_once_and_on_recovery() -> None:
     later = now + timedelta(days=2)
     alerts, _ = make_watch({}, {}, recovered, state).run(later)
     assert [(a[0], a[2]) for a in alerts] == [("Always-on electricity back to normal", "low")]
+
+
+def test_baseload_says_when_it_will_start() -> None:
+    gas, temps = history()
+    last = max(gas)
+    rows = [r for i in range(7) for r in rows_for(last - timedelta(days=6 - i), 150)]
+    _, status = make_watch(gas, temps, rows, State()).run(
+        datetime.combine(last + timedelta(days=1), time(10)).astimezone()
+    )
+    assert status["base_now"] == "learning"
+    assert status["base_usual"] == f"from {last + timedelta(days=3):%a %-d %b}"

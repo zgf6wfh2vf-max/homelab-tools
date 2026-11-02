@@ -31,7 +31,7 @@ import urllib.parse
 import urllib.request
 from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -193,6 +193,10 @@ def baseloads(rows: Sequence[tuple[float, float]], quiet_slots: int = 6) -> dict
     }
 
 
+#: Complete days needed before the baseload is judged: the two days checked plus a week before them.
+BASELOAD_MIN_DAYS = 9
+
+
 @dataclass(frozen=True)
 class BaseloadCheck:
     """Recent baseload against its usual level."""
@@ -221,24 +225,35 @@ def check_baseload(
 
 @dataclass
 class State:
-    """What has already been checked and reported, kept between runs."""
+    """What has already been checked and reported, kept between runs.
+
+    Attributes:
+        gas_checked: The last gas day checked (ISO date).
+        baseload_high: Whether a high baseload has been reported and not yet cleared.
+        gas_status: Dashboard fields from the last gas check, shown until the next day is checked.
+    """
 
     gas_checked: str = ""
     baseload_high: bool = False
+    gas_status: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: Path) -> State:
         """Read the state file, or start fresh."""
         try:
             data = json.loads(path.read_text())
-            return cls(str(data.get("gas_checked", "")), bool(data.get("baseload_high", False)))
+            return cls(
+                str(data.get("gas_checked", "")),
+                bool(data.get("baseload_high", False)),
+                {str(k): str(v) for k, v in data.get("gas_status", {}).items()},
+            )
         except (OSError, ValueError):
             return cls()
 
     def save(self, path: Path) -> None:
         """Write the state file."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"gas_checked": self.gas_checked, "baseload_high": self.baseload_high}))
+        path.write_text(json.dumps(self.__dict__))
 
 
 Alert = tuple[str, str, str]  # title, message, priority
@@ -304,6 +319,7 @@ class Watch:
         status: dict[str, str] = {}
         if self.temperatures:
             alerts += self._gas(now, status)
+            status.update(self.state.gas_status)  # the last gas day checked, even if none was new
         alerts += self._baseload(now, status)
         status["checked"] = f"{now:%d %b %H:%M}"
         return alerts, status
@@ -331,12 +347,12 @@ class Watch:
             if check.unusual:
                 alerts.append(gas_alert(check))
             self.state.gas_checked = day.isoformat()
-            status.update(
-                gas_day=f"{day:%a %-d %b}",
-                gas_used=f"{check.used:.0f} kWh",
-                gas_expected=f"{check.expected:.0f} kWh",
-                gas_outside=f"{check.temperature:.1f} °C",
-            )
+            self.state.gas_status = {
+                "gas_day": f"{day:%a %-d %b}",
+                "gas_used": f"{check.used:.0f} kWh",
+                "gas_expected": f"{check.expected:.0f} kWh",
+                "gas_outside": f"{check.temperature:.1f} °C",
+            }
         return alerts
 
     def _baseload(self, now: datetime, status: dict[str, str]) -> list[Alert]:
@@ -347,9 +363,12 @@ class Watch:
             midnight.timestamp(),
             1800,
         )
-        check = check_baseload(baseloads(rows), self.factor, self.min_w)
+        loads = baseloads(rows)
+        check = check_baseload(loads, self.factor, self.min_w)
         if check is None:
-            log.info("baseload: not enough history yet")
+            ready = now.date() + timedelta(days=max(1, BASELOAD_MIN_DAYS - len(loads)))
+            log.info("baseload: not enough history yet (%d of %d days)", len(loads), BASELOAD_MIN_DAYS)
+            status.update(base_now="learning", base_usual=f"from {ready:%a %-d %b}")
             return []
         log.info("baseload %.0f W, usual %.0f W%s", check.latest, check.usual, " HIGH" if check.high else "")
         status.update(base_now=f"{check.latest:.0f} W", base_usual=f"{check.usual:.0f} W")

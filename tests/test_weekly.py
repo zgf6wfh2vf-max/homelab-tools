@@ -114,10 +114,10 @@ def test_part_weeks_are_not_compared() -> None:
     one_day = WeekFigures(date(2026, 10, 19), solar_kwh=17.0, solar_days=1)
     assert "Solar 17 kWh (1 day recorded)." in format_report(one_day, None)[1]
     d = display(part, full)
-    assert d["net_change"] == d["gas_change"] == "-"  # cost comparisons need complete weeks
+    assert d["net_change"] == d["gas_change"] == "part week"  # cost comparisons need complete weeks
     first_solar_day = collect(FakeVM(FULL), date(2026, 10, 19))
     first_solar_day.solar_days = 1  # inverter monitoring started on the last day of the week
-    assert display(full, first_solar_day)["solar_change"] == "-"
+    assert display(full, first_solar_day)["solar_change"] == "part week"
     empty = WeekFigures(date(2026, 10, 26))
     assert format_report(empty, None) == ("Week 26 Oct-1 Nov", "No data was recorded this week.")
 
@@ -137,7 +137,7 @@ def test_display_fields_and_changes() -> None:
     )
     assert (d["solar"], d["car"], d["offpeak"], d["gas_kwh"]) == ("38 kWh", "61 kWh", "92%", "160 kWh")
     assert d["net_change"] == "▼ £2.10" and d["car_change"] == "same" and d["solar_change"] == "same"
-    assert display(this, None)["net_change"] == "-"
+    assert display(this, None)["net_change"] == display(this, None)["car_change"] == "first week"
 
 
 SYSTEMS = {

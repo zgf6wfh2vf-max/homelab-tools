@@ -40,6 +40,7 @@ weekly-report --week-ending 2026-10-25 # a specific week (ending on that Sunday)
 
 **Status** (`weekly.json`): `week`, `net`, `electric`, `gas`, `export`, `solar`, `car`, `offpeak`,
 `gas_kwh`, and changes against the previous week: `net_change`, `solar_change`, `car_change`,
-`gas_change` (e.g. `▼ £2.10`); and for the systems line `outages` (count and total length, or
+`gas_change` (e.g. `▼ £2.10`; "part week" when either week is missing days of data, "first week"
+when there is no previous week); and for the systems line `outages` (count and total length, or
 "none"), `broadband` (median download / upload) and `powerline` (weekly average of the slowest and
 fastest link).

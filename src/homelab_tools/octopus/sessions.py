@@ -12,6 +12,9 @@ Octopus runs demand-flexibility events through its GraphQL API:
 This tool only reads: it sends a notification when a new event is announced (saying whether you
 have joined it), and another once Octopus has worked out the result of an event you joined -
 including when it paid nothing because of ``MISSING_READINGS``, which is worth raising with Octopus.
+It also checks which meter your saving-sessions sign-up is on: Octopus can register it against an
+*export* MPAN, which has no import readings, so every Power Down then fails with
+``MISSING_READINGS``. That is reported once (high priority), with "OK again" when it is fixed.
 It never joins events for you.
 
 Authentication: your account API key (the same one ``octopus-collector`` uses) is exchanged for a
@@ -52,7 +55,7 @@ query($account: String!) {
   savingSessions {
     events { id code startAt endAt status eventType rewardPerKwhInOctoPoints }
     account(accountNumber: $account) {
-      hasJoinedCampaign tokenBalance
+      hasJoinedCampaign tokenBalance signedUpMeterPoint { mpan }
       joinedEvents { eventId startAt endAt eventType eventStatus resultsStatus rewardGivenInOctoPoints }
     }
   }
@@ -142,6 +145,10 @@ class Snapshot:
     upcoming: list[Event] = field(default_factory=list)
     outcomes: list[Outcome] = field(default_factory=list)
     points_balance: int | None = None
+    #: The MPAN the saving-sessions sign-up is registered against (``None`` if not signed up).
+    signed_up_mpan: str | None = None
+    #: Which of the account's meters that is: ``import``, ``export`` or ``other`` (``None``: unknown).
+    signed_up_meter: str | None = None
 
 
 def parse_sessions(sessions: Mapping[str, Any], types: Iterable[str], now: datetime) -> Snapshot:
@@ -149,7 +156,10 @@ def parse_sessions(sessions: Mapping[str, Any], types: Iterable[str], now: datet
     wanted = set(types)
     account = sessions.get("account") or {}
     joined = {int(e["eventId"]) for e in account.get("joinedEvents") or []}
-    snapshot = Snapshot(points_balance=account.get("tokenBalance"))
+    signed_up = (account.get("signedUpMeterPoint") or {}).get("mpan")
+    snapshot = Snapshot(
+        points_balance=account.get("tokenBalance"), signed_up_mpan=signed_up and str(signed_up)
+    )
     for e in sessions.get("events") or []:
         end = parse_time(e["endAt"])
         if e["eventType"] in wanted and end > now:
@@ -197,14 +207,16 @@ class OctopusFlex:
     Attributes:
         api_key: Account API key.
         account: Account number (``A-...``).
-        mpan: Import MPAN (for campaign queries).
+        mpan: Import MPAN (for campaign queries, and the meter saving sessions should use).
         post: GraphQL transport.
+        export_mpans: The account's export MPANs, to recognise a sign-up on the wrong meter.
     """
 
     api_key: str
     account: str
     mpan: str
     post: Post = http_post
+    export_mpans: tuple[str, ...] = ()
 
     def token(self) -> str:
         """Exchange the API key for a short-lived token."""
@@ -218,6 +230,14 @@ class OctopusFlex:
             self.post(BACKEND, SESSIONS_QUERY, {"account": self.account}, token), "savingSessions"
         )
         snapshot = parse_sessions(sessions, types, now)
+        if snapshot.signed_up_mpan:
+            snapshot.signed_up_meter = (
+                "import"
+                if snapshot.signed_up_mpan == self.mpan
+                else "export"
+                if snapshot.signed_up_mpan in self.export_mpans
+                else "other"
+            )
         for slug in campaigns:
             variables = {"account": self.account, "mpan": self.mpan, "slug": slug}
             try:
@@ -277,20 +297,60 @@ class State:
 
     announced: list[str] = field(default_factory=list)
     reported: list[str] = field(default_factory=list)
+    #: The wrong-meter problem that has been reported (empty when none is open).
+    meter_alerted: str = ""
 
     @classmethod
     def load(cls, path: Path) -> State | None:
         """The saved state, or ``None`` on the very first run."""
         try:
             raw = json.loads(path.read_text())
-            return cls(list(raw.get("announced", [])), list(raw.get("reported", [])))
+            return cls(
+                list(raw.get("announced", [])),
+                list(raw.get("reported", [])),
+                str(raw.get("meter_alerted", "")),
+            )
         except (OSError, ValueError):
             return None
 
     def save(self, path: Path) -> None:
         """Write the state (keeping the most recent 500 keys of each kind)."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"announced": self.announced[-500:], "reported": self.reported[-500:]}))
+        path.write_text(
+            json.dumps(
+                {
+                    "announced": self.announced[-500:],
+                    "reported": self.reported[-500:],
+                    "meter_alerted": self.meter_alerted,
+                }
+            )
+        )
+
+
+METER_PROBLEMS = {
+    "export": "Your Octopus saving-sessions sign-up is registered against your EXPORT meter, which has no "
+    "import readings, so every Power Down will come back as 'missing readings' with no reward. Ask "
+    "Octopus to move the sign-up to your import MPAN.",
+    "other": "Your Octopus saving-sessions sign-up is registered against a meter that isn't your import "
+    "meter, so Power Down results may come back as 'missing readings'. Ask Octopus to check it.",
+}
+
+
+def meter_alerts(snapshot: Snapshot, state: State) -> list[tuple[str, str, str]]:
+    """Report a sign-up on the wrong meter once, and say when it is fixed."""
+    meter = snapshot.signed_up_meter
+    if meter is None:
+        return []  # not signed up, or not known this run
+    problem = METER_PROBLEMS.get(meter, "")
+    alerts = []
+    if problem and state.meter_alerted != meter:
+        alerts.append(("Octopus sessions: wrong meter", problem, "high"))
+    elif not problem and state.meter_alerted:
+        alerts.append(
+            ("Octopus sessions: meter OK", "Your saving-sessions sign-up is now on your import meter.", "low")
+        )
+    state.meter_alerted = meter if problem else ""
+    return alerts
 
 
 def process(
@@ -299,7 +359,7 @@ def process(
     """Decide what to send. On the first run, existing results are recorded silently (no backlog flood)."""
     first_run = state is None
     state = state or State()
-    alerts = []
+    alerts = meter_alerts(snapshot, state)  # even on the first run: it is why results go missing
     for event in sorted(snapshot.upcoming, key=lambda e: e.start):
         if event.key not in state.announced:
             state.announced.append(event.key)
@@ -335,6 +395,9 @@ def display(snapshot: Snapshot, now: datetime) -> dict[str, str]:
         "last_result": _result_text(last) if last else "-",
         "missing_90d": f"{sum(o.status == 'MISSING_READINGS' for o in recent)} of {len(recent)}",
         "points": str(snapshot.points_balance) if snapshot.points_balance is not None else "-",
+        "meter": {"import": "import", "export": "EXPORT (wrong)", "other": "other (wrong)"}.get(
+            snapshot.signed_up_meter or "", "-"
+        ),
     }
 
 
@@ -353,7 +416,8 @@ def main() -> None:
     outputs = Outputs.from_env()
     config = json.loads(Path(env_str("OCTOPUS_CONFIG", "/etc/octopus/config.json")).read_text())
     mpan = next(str(m["mpan"]) for m in config["electricity"] if not m.get("export"))
-    flex = OctopusFlex(load_key(), str(config["account"]), mpan)
+    exports = tuple(str(m["mpan"]) for m in config["electricity"] if m.get("export"))
+    flex = OctopusFlex(load_key(), str(config["account"]), mpan, export_mpans=exports)
     state_file = Path(env_str("SESSIONS_STATE_FILE", "/var/lib/octopus-sessions/state.json"))
     now = datetime.now(UTC)
     snapshot = flex.snapshot(

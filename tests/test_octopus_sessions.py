@@ -59,6 +59,7 @@ SESSIONS = {
     "account": {
         "hasJoinedCampaign": True,
         "tokenBalance": 7,
+        "signedUpMeterPoint": {"mpan": "1234567890123"},
         "joinedEvents": [
             {"eventId": 7517, "startAt": "2026-10-19T17:00:00+00:00", "endAt": "2026-10-19T18:00:00+00:00",
              "eventType": "TURN_DOWN", "eventStatus": "DONE", "resultsStatus": "MISSING_READINGS",
@@ -174,6 +175,7 @@ def test_display() -> None:
         "last_result": "missing readings",
         "missing_90d": "1 of 1",
         "points": "7",
+        "meter": "import",
     }
 
 
@@ -195,3 +197,30 @@ def test_results_still_being_calculated_wait_for_the_final_figure() -> None:
     snap = flex(FakeAPI(sessions)).snapshot(["TURN_DOWN"], [], later)
     _, alerts = process(snap, state, later)
     assert ("Power Down result", "Power Down on Mon 26 Oct: 240 Octopoints (completed).", "low") in alerts
+
+
+def test_a_sign_up_on_the_export_meter_is_reported_once_then_cleared() -> None:
+    on_export = SESSIONS | {
+        "account": SESSIONS["account"] | {"signedUpMeterPoint": {"mpan": "9900000000001"}}
+    }
+    api = FakeAPI(on_export)
+    snap = OctopusFlex(
+        "k", "A-TEST0001", "1234567890123", post=api, export_mpans=("9900000000001",)
+    ).snapshot(["TURN_DOWN"], [], NOW)
+    assert snap.signed_up_meter == "export" and display(snap, NOW)["meter"] == "EXPORT (wrong)"
+    state, alerts = process(snap, None, NOW)  # even on the first run
+    assert alerts[0][0] == "Octopus sessions: wrong meter" and alerts[0][2] == "high"
+    assert "EXPORT meter" in alerts[0][1]
+    assert process(snap, state, NOW)[1] == []  # told once
+    fixed = flex(FakeAPI()).snapshot(["TURN_DOWN"], [], NOW)
+    assert process(fixed, state, NOW)[1] == [
+        ("Octopus sessions: meter OK", "Your saving-sessions sign-up is now on your import meter.", "low")
+    ]
+    assert state.meter_alerted == ""
+
+
+def test_not_signed_up_means_no_meter_verdict() -> None:
+    account = {k: v for k, v in SESSIONS["account"].items() if k != "signedUpMeterPoint"}
+    snap = flex(FakeAPI(SESSIONS | {"account": account})).snapshot(["TURN_DOWN"], [], NOW)
+    assert snap.signed_up_meter is None and display(snap, NOW)["meter"] == "-"
+    assert process(snap, State(), NOW)[1][0][0] != "Octopus sessions: wrong meter"

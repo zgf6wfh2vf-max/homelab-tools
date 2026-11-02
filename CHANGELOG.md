@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0
+
+* `octopus-sessions`: checks which meter the saving-sessions sign-up is registered against, and
+  sends one high-priority alert if it's the export meter (or any meter other than the import one).
+  A sign-up on the export meter makes every Power Down come back as "missing readings". New status
+  field `meter`.
+
 ## 0.11.0
 
 * `weekly-report` and `usage-watch`: dashboard fields say why they're empty: "part week" or

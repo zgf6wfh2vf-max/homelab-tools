@@ -38,8 +38,12 @@ Octopus changes these schemes often, so the event types and campaigns are settin
 **Worth knowing with a battery:** Power Down rewards are measured against your *usual* import for
 that hour. If a home battery already covers the evening peak, there's little import left to cut, so
 the reward will be small whatever you do. And if every result says `MISSING_READINGS`, the reward
-was never calculated. The author's account showed this for 14 sessions in a row, despite complete
-half-hourly data in the API, so it's worth raising with Octopus.
+was never calculated. The author's account showed this for 16 sessions in a row, despite complete
+half-hourly data in the API. The cause was the sign-up itself: Octopus had registered it against
+the account's **export** MPAN, which has no import readings to judge a Power Down by. The tool now
+checks this on every run and sends one high-priority alert if the sign-up is on the export meter
+(or any meter other than your import one). The fix is to ask Octopus to move the sign-up to your
+import MPAN. List export meters in the config with `"export": true` so the tool can tell them apart.
 
 ## Settings
 
@@ -62,5 +66,6 @@ example timer runs every 30 minutes. Sessions are usually announced the day befo
 ## Outputs
 
 **Status** (`sessions.json`): `next` (the next announced event), `reward`, `joined`, `last_result`,
-`missing_90d` (results with missing readings, out of all results in 90 days), `points` (Octopoints
+`missing_90d` (results with missing readings, out of all results in 90 days), `meter` (which meter
+the sign-up is on: "import", or "EXPORT (wrong)" / "other (wrong)"), `points` (Octopoints
 balance), `checked`.

@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import os
 import time as systime
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 
 import pytest
 
+from homelab_tools.battery.check import Battery, outlook_between
 from homelab_tools.octopus.sessions import (
     BACKEND,
     MAIN,
+    Event,
     OctopusFlex,
     OctopusGraphQLError,
+    SessionBattery,
+    Snapshot,
     State,
+    battery_alerts,
     display,
     process,
 )
@@ -176,6 +181,7 @@ def test_display() -> None:
         "missing_90d": "1 of 1",
         "points": "7",
         "meter": "import",
+        "battery": "-",
     }
 
 
@@ -224,3 +230,76 @@ def test_not_signed_up_means_no_meter_verdict() -> None:
     snap = flex(FakeAPI(SESSIONS | {"account": account})).snapshot(["TURN_DOWN"], [], NOW)
     assert snap.signed_up_meter is None and display(snap, NOW)["meter"] == "-"
     assert process(snap, State(), NOW)[1][0][0] != "Octopus sessions: wrong meter"
+
+
+# Battery check: a 10 kWh battery with a 20% reserve, no losses, no sun, and a house using 1 kW all day.
+BATT = Battery(10, full_pct=100, reserve_pct=20, efficiency=1.0)
+FLAT_1KW = {time(h, m): 1000.0 for h in range(24) for m in (0, 30)}
+SESSION = Event(
+    "session:9",
+    "Power Down",
+    datetime(2026, 10, 27, 17, 0, tzinfo=UTC),
+    datetime(2026, 10, 27, 18, 0, tzinfo=UTC),
+    149,
+    True,
+)
+
+
+def outlook_for(soc_pct: float, now: datetime, event: Event = SESSION) -> SessionBattery:
+    """Simulate like the real check, but with a fixed load and no solar."""
+    before = outlook_between((now, event.start), BATT, {}, FLAT_1KW, BATT.capacity_kwh * soc_pct / 100)
+    during = outlook_between((event.start, event.end), BATT, {}, FLAT_1KW, before.end_kwh)
+    return SessionBattery(event, soc_pct, before, during)
+
+
+def test_battery_warning_when_it_runs_out_before_the_session() -> None:
+    now = datetime(2026, 10, 27, 13, 0, tzinfo=UTC)
+    snap, state = Snapshot(upcoming=[SESSION]), State()
+    # 50% = 3 kWh above the reserve: lasts until 16:00, so the whole session (1 kWh) is from the grid.
+    alerts, outlook = battery_alerts(snap, state, now, lambda e, n: outlook_for(50, n), 8, 0.2)
+    assert outlook is not None and outlook.during.grid_kwh == pytest.approx(1.0)
+    assert alerts == [
+        (
+            "Battery may not last: Power Down today 17:00-18:00",
+            "The battery is at 50% and will probably run down to its reserve around 16:00, before it "
+            "starts. That leaves about 1.0 kWh to come from the grid during the session, which counts "
+            "against your saving. Put off heavy appliances (dryer, oven, washing, car) until after 18:00.",
+            "default",
+        )
+    ]
+    assert display(snap, now, outlook)["battery"] == "short 1.0 kWh"
+    # Told once per session.
+    assert battery_alerts(snap, state, now, lambda e, n: outlook_for(50, n), 8, 0.2)[0] == []
+    # Already at the reserve: say so rather than giving a time.
+    flat = battery_alerts(Snapshot(upcoming=[SESSION]), State(), now, lambda e, n: outlook_for(19, n), 8, 0.2)
+    assert flat[0][0][1].startswith("The battery is at 19% and is already down to its reserve. That leaves")
+
+
+def test_no_battery_warning_when_it_lasts_or_the_session_is_not_relevant() -> None:
+    now = datetime(2026, 10, 27, 13, 0, tzinfo=UTC)
+    # 80% = 6 kWh above the reserve: 4 kWh to 17:00, 1 kWh for the session, 1 kWh to spare.
+    alerts, outlook = battery_alerts(
+        Snapshot(upcoming=[SESSION]), State(), now, lambda e, n: outlook_for(80, n), 8, 0.2
+    )
+    assert alerts == [] and outlook is not None and display(Snapshot(), now, outlook)["battery"] == "lasts"
+
+    def never(e: Event, n: datetime) -> SessionBattery:
+        raise AssertionError("should not be checked")
+
+    not_joined = Event(SESSION.key, "Power Down", SESSION.start, SESSION.end, 149, False)
+    power_up = Event(SESSION.key, "Power Up", SESSION.start, SESSION.end, 149, True)
+    for upcoming, at in (
+        ([not_joined], now),
+        ([power_up], now),
+        ([SESSION], SESSION.start - timedelta(hours=9)),  # too far ahead
+        ([SESSION], SESSION.start + timedelta(minutes=10)),  # already started
+    ):
+        assert battery_alerts(Snapshot(upcoming=upcoming), State(), at, never, 8, 0.2) == ([], None)
+    # No data: nothing to say.
+    assert battery_alerts(Snapshot(upcoming=[SESSION]), State(), now, lambda e, n: None, 8, 0.2) == ([], None)
+
+
+def test_battery_warned_survives_a_save(tmp_path: Path) -> None:
+    state = State(battery_warned=["session:9"])
+    state.save(tmp_path / "s.json")
+    assert State.load(tmp_path / "s.json") == state

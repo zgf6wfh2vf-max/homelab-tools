@@ -45,6 +45,26 @@ checks this on every run and sends one high-priority alert if the sign-up is on 
 (or any meter other than your import one). The fix is to ask Octopus to move the sign-up to your
 import MPAN. List export meters in the config with `"export": true` so the tool can tell them apart.
 
+## Will the battery last?
+
+With a home battery, a Power Down mostly comes down to whether the battery still has charge when the
+session starts. If `BATTERY_KWH` and `VM_URL` are set, then for a Power Down you have joined that
+starts within `SESSION_BATTERY_HOURS`, each run simulates the battery from its current charge to the
+end of the session. It uses the same model as [battery-check](battery-check.md): typical house use
+for each half-hour over the last week, plus the saved solar forecast. If the house would need more
+than `SESSION_SHORTFALL_KWH` from the grid during the session, you get one warning per session:
+
+```text
+Battery may not last: Power Down today 17:00-18:00
+The battery is at 45% and will probably run down to its reserve around 15:30, before it starts.
+That leaves about 0.4 kWh to come from the grid during the session, which counts against your
+saving. Put off heavy appliances (dryer, oven, washing, car) until after 18:00.
+```
+
+The check runs every 30 minutes, so it also catches an afternoon where something heavy (a tumble
+dryer, say) drains the battery after an earlier check said it would last. It never changes anything
+on the inverter.
+
 ## Settings
 
 | Setting | Default | Meaning |
@@ -56,6 +76,10 @@ import MPAN. List export meters in the config with `"export": true` so the tool 
 | `OCTOPOINTS_PER_POUND` | 800 | For the approximate pence value in messages |
 | `SESSIONS_STATE_FILE` | `/var/lib/octopus-sessions/state.json` | Events already announced, results already reported |
 | `NTFY_URL`, `STATUS_DIR` | - | Outputs (see [installation](installation.md)) |
+| `BATTERY_KWH`, `VM_URL` | unset | Both set: turn on the battery check |
+| `SESSION_BATTERY_HOURS` | 8 | Check sessions that start within this many hours |
+| `SESSION_SHORTFALL_KWH` | 0.2 | Warn when the session would need at least this much from the grid |
+| `BATTERY_RESERVE_PCT`, `BATTERY_EFFICIENCY`, `SOLAR_CURVE_FILE`, `LOAD_METRIC`, `SOC_METRIC`, `PROFILE_DAYS` | as [battery-check](battery-check.md) | The battery model |
 
 A result is reported once Octopus has finished calculating it, usually a day or two after the
 session. While it is still "calculating", `last_result` says so and no notification is sent.
@@ -68,4 +92,6 @@ example timer runs every 30 minutes. Sessions are usually announced the day befo
 **Status** (`sessions.json`): `next` (the next announced event), `reward`, `joined`, `last_result`,
 `missing_90d` (results with missing readings, out of all results in 90 days), `meter` (which meter
 the sign-up is on: "import", or "EXPORT (wrong)" / "other (wrong)"), `points` (Octopoints
-balance), `checked`.
+balance), `battery` (for the next joined Power Down within `SESSION_BATTERY_HOURS`: "lasts", or
+"short 0.4 kWh" for the expected grid use during it; "-" when there is none or no battery check),
+`checked`.

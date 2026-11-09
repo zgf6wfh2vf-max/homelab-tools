@@ -150,6 +150,7 @@ class Outlook:
         grid_kwh: House use the battery and solar cannot cover (bought at the peak rate).
         export_kwh: Solar that neither the house nor the battery can take.
         runs_out: When the battery first reaches its reserve, if it does.
+        end_kwh: Energy left in the battery at the end of the period.
     """
 
     start: datetime
@@ -158,21 +159,27 @@ class Outlook:
     grid_kwh: float
     export_kwh: float
     runs_out: datetime | None
+    end_kwh: float = 0.0
 
 
 def simulate(
-    battery: Battery, period: tuple[datetime, datetime], solar: Sequence[float], load: Sequence[float]
+    battery: Battery,
+    period: tuple[datetime, datetime],
+    solar: Sequence[float],
+    load: Sequence[float],
+    start_kwh: float | None = None,
 ) -> Outlook:
     """Step the battery through the period's half-hour slots.
 
     Args:
-        battery: Battery parameters; it starts the period at ``full_pct``.
-        period: Start and end of the peak period.
+        battery: Battery parameters.
+        period: Start and end of the period.
         solar: Forecast kWh per slot.
         load: Expected house kWh per slot.
+        start_kwh: Energy in the battery at the start; ``None`` means full (``full_pct``).
     """
     starts = slots(*period)
-    stored = battery.capacity_kwh * battery.full_pct / 100
+    stored = battery.capacity_kwh * battery.full_pct / 100 if start_kwh is None else start_kwh
     grid = export = 0.0
     runs_out = None
     for start, pv, use in zip(starts, solar, load, strict=True):
@@ -189,7 +196,7 @@ def simulate(
             grid += -net - taken
             if runs_out is None:
                 runs_out = start + SLOT * (taken / -net)
-    return Outlook(period[0], sum(solar), sum(load), grid, export, runs_out)
+    return Outlook(period[0], sum(solar), sum(load), grid, export, runs_out, stored)
 
 
 def tomorrow_outlook(
@@ -204,17 +211,48 @@ def tomorrow_outlook(
     Raises:
         ValueError: If the load profile lacks a slot, or the forecast does not cover ``day``.
     """
-    period = peak_period(day, cheap)
+    if not any(t.astimezone().date() == day for t in curve):
+        raise ValueError(f"the solar forecast does not cover {day}")
+    return outlook_between(peak_period(day, cheap), battery, curve, profile)
+
+
+def outlook_between(
+    period: tuple[datetime, datetime],
+    battery: Battery,
+    curve: Mapping[datetime, float],
+    profile: Mapping[time, float],
+    start_kwh: float | None = None,
+) -> Outlook:
+    """Simulate any period that starts on a half-hour, from a forecast curve and a load profile.
+
+    Raises:
+        ValueError: If the load profile lacks a slot in the period.
+    """
     starts = slots(*period)
     missing = [s for s in starts if s.time() not in profile]
     if missing:
         raise ValueError(f"no house-load history for {len(missing)} half-hours yet (e.g. {missing[0]:%H:%M})")
     points = sorted(curve.items())
-    if not any(t.astimezone().date() == day for t, _ in points):
-        raise ValueError(f"the solar forecast does not cover {day}")
     solar = [solar_kwh(points, s) for s in starts]
     load = [profile[s.time()] * (SLOT / timedelta(hours=1)) / 1000 for s in starts]
-    return simulate(battery, period, solar, load)
+    return simulate(battery, period, solar, load, start_kwh)
+
+
+def slot_floor(moment: datetime) -> datetime:
+    """The start of the half-hour slot ``moment`` falls in (local time)."""
+    local = moment.astimezone()
+    return local.replace(minute=0 if local.minute < 30 else 30, second=0, microsecond=0)
+
+
+def load_history(settings: Settings, history: RangeQuery, now: datetime) -> dict[time, float]:
+    """Typical house power per half-hour over the last ``profile_days`` days."""
+    rows = history(
+        f"avg_over_time({settings.load_metric}[30m])",
+        (now - timedelta(days=settings.profile_days)).timestamp(),
+        now.timestamp(),
+        int(SLOT.total_seconds()),
+    )
+    return load_profile(rows)
 
 
 def round_to_slot(moment: datetime) -> datetime:
@@ -338,13 +376,9 @@ def run_evening(
     fetched, curve = load_curve(settings.curve_file)
     if now - fetched > timedelta(hours=6):
         log.warning("the solar forecast is from %s; is solar-forecast running?", fetched)
-    rows = history(
-        f"avg_over_time({settings.load_metric}[30m])",
-        (now - timedelta(days=settings.profile_days)).timestamp(),
-        now.timestamp(),
-        int(SLOT.total_seconds()),
+    outlook = tomorrow_outlook(
+        day, settings.cheap, settings.battery, curve, load_history(settings, history, now)
     )
-    outlook = tomorrow_outlook(day, settings.cheap, settings.battery, curve, load_profile(rows))
     rate = query(f"max_over_time({settings.rate_metric}[7d])", now.timestamp())
     return outlook_display(outlook), evening_message(outlook, settings.shortfall_kwh, rate, settings.cheap[0])
 

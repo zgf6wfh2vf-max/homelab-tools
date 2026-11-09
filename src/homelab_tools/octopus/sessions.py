@@ -17,12 +17,20 @@ It also checks which meter your saving-sessions sign-up is on: Octopus can regis
 ``MISSING_READINGS``. That is reported once (high priority), with "OK again" when it is fixed.
 It never joins events for you.
 
+Battery check (optional, when ``BATTERY_KWH`` and ``VM_URL`` are set): for a Power Down you have
+joined that starts within ``SESSION_BATTERY_HOURS`` (8), it simulates the battery from its current
+charge until the session ends, using the same model as ``battery-check`` (typical house use for each
+half-hour, the saved solar forecast). If the house would need more than ``SESSION_SHORTFALL_KWH``
+(0.2) from the grid during the session, it says so once, with roughly when the battery runs out.
+
 Authentication: your account API key (the same one ``octopus-collector`` uses) is exchanged for a
 short-lived token with the ``obtainKrakenToken`` mutation.
 
 Settings (environment): ``OCTOPUS_API_KEY_FILE`` / ``OCTOPUS_API_KEY``, ``OCTOPUS_CONFIG``,
 ``SESSION_TYPES`` (``TURN_DOWN TURN_UP``), ``CAMPAIGNS`` (``free_electricity``),
-``OCTOPOINTS_PER_POUND`` (800), ``SESSIONS_STATE_FILE``, ``NTFY_URL``, ``STATUS_DIR``.
+``OCTOPOINTS_PER_POUND`` (800), ``SESSIONS_STATE_FILE``, ``NTFY_URL``, ``STATUS_DIR``; for the
+battery check ``VM_URL``, ``BATTERY_KWH``, ``SESSION_BATTERY_HOURS``, ``SESSION_SHORTFALL_KWH`` and
+``battery-check``'s battery settings (``BATTERY_RESERVE_PCT``, ``SOLAR_CURVE_FILE``, ...).
 """
 
 from __future__ import annotations
@@ -37,9 +45,19 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from homelab_tools.battery.check import (
+    Outlook,
+    Settings,
+    load_history,
+    outlook_between,
+    round_to_slot,
+    slot_floor,
+)
 from homelab_tools.common.config import ConfigError, Outputs, env_float, env_str
+from homelab_tools.common.metrics import vm_query, vm_range
 from homelab_tools.common.notify import Notifier
 from homelab_tools.common.status import write_status
+from homelab_tools.forecast.solar import load_curve
 
 log = logging.getLogger("octopus-sessions")
 
@@ -299,6 +317,8 @@ class State:
     reported: list[str] = field(default_factory=list)
     #: The wrong-meter problem that has been reported (empty when none is open).
     meter_alerted: str = ""
+    #: Sessions already warned about a battery that will not last.
+    battery_warned: list[str] = field(default_factory=list)
 
     @classmethod
     def load(cls, path: Path) -> State | None:
@@ -309,6 +329,7 @@ class State:
                 list(raw.get("announced", [])),
                 list(raw.get("reported", [])),
                 str(raw.get("meter_alerted", "")),
+                list(raw.get("battery_warned", [])),
             )
         except (OSError, ValueError):
             return None
@@ -322,6 +343,7 @@ class State:
                     "announced": self.announced[-500:],
                     "reported": self.reported[-500:],
                     "meter_alerted": self.meter_alerted,
+                    "battery_warned": self.battery_warned[-100:],
                 }
             )
         )
@@ -353,6 +375,103 @@ def meter_alerts(snapshot: Snapshot, state: State) -> list[tuple[str, str, str]]
     return alerts
 
 
+@dataclass(frozen=True)
+class SessionBattery:
+    """How the battery is expected to cope with one session.
+
+    Attributes:
+        event: The session.
+        soc_pct: State of charge when it was worked out.
+        before: From now until the session starts.
+        during: The session itself.
+    """
+
+    event: Event
+    soc_pct: float
+    before: Outlook
+    during: Outlook
+
+
+#: Works out the battery outlook for a session; ``None`` when there is not enough data.
+BatteryCheck = Callable[[Event, datetime], SessionBattery | None]
+
+
+def battery_target(snapshot: Snapshot, now: datetime, hours: float) -> Event | None:
+    """The next joined Power Down that starts within ``hours`` (and hasn't started yet)."""
+    for event in sorted(snapshot.upcoming, key=lambda e: e.start):
+        if event.kind == "Power Down" and event.joined and now < event.start <= now + timedelta(hours=hours):
+            return event
+    return None
+
+
+def battery_message(outlook: SessionBattery, now: datetime) -> tuple[str, str, str]:
+    """Warning that the battery will not cover a session: (title, message, priority)."""
+    event = outlook.event
+    runs_out = outlook.before.runs_out or outlook.during.runs_out
+    if runs_out is not None and runs_out <= outlook.before.start:
+        state = "is already down to its reserve"
+    else:
+        timing = "before it starts" if outlook.before.runs_out else "during it"
+        when_out = f" around {round_to_slot(runs_out):%H:%M}" if runs_out else ""
+        state = f"will probably run down to its reserve{when_out}, {timing}"
+    message = (
+        f"The battery is at {outlook.soc_pct:.0f}% and {state}. That leaves about "
+        f"{outlook.during.grid_kwh:.1f} kWh to come from the grid during the session, which counts "
+        "against your saving. Put off heavy appliances (dryer, oven, washing, car) "
+        f"until after {event.end.astimezone():%H:%M}."
+    )
+    return f"Battery may not last: {event.kind} {when(event, now)}", message, "default"
+
+
+def battery_alerts(
+    snapshot: Snapshot, state: State, now: datetime, check: BatteryCheck, hours: float, shortfall_kwh: float
+) -> tuple[list[tuple[str, str, str]], SessionBattery | None]:
+    """Warn once per session if the battery is not expected to cover it; also returns the outlook."""
+    event = battery_target(snapshot, now, hours)
+    if event is None:
+        return [], None
+    outlook = check(event, now)
+    if outlook is None:
+        return [], None
+    alerts = []
+    if outlook.during.grid_kwh >= shortfall_kwh and event.key not in state.battery_warned:
+        state.battery_warned.append(event.key)
+        alerts.append(battery_message(outlook, now))
+    return alerts, outlook
+
+
+def battery_display(outlook: SessionBattery | None) -> str:
+    """The ``battery`` status field: ``lasts``, ``short 0.4 kWh`` or ``-``."""
+    if outlook is None:
+        return "-"
+    grid = outlook.during.grid_kwh
+    return f"short {grid:.1f} kWh" if grid >= 0.05 else "lasts"
+
+
+def vm_battery_check(settings: Settings, vm_url: str) -> BatteryCheck:
+    """A :data:`BatteryCheck` using VictoriaMetrics and the saved solar forecast."""
+
+    def check(event: Event, now: datetime) -> SessionBattery | None:
+        try:
+            soc = vm_query(vm_url)(f"last_over_time({settings.soc_metric}[1h])", now.timestamp())
+            if soc is None:
+                log.warning("battery check: no recent %s", settings.soc_metric)
+                return None
+            _, curve = load_curve(settings.curve_file)
+            profile = load_history(settings, vm_range(vm_url), now)
+            battery = settings.battery
+            slot = slot_floor(now)
+            start, end = slot_floor(event.start), event.end.astimezone()
+            before = outlook_between((slot, start), battery, curve, profile, battery.capacity_kwh * soc / 100)
+            during = outlook_between((start, end), battery, curve, profile, before.end_kwh)
+        except (OSError, ValueError) as exc:
+            log.warning("battery check: %s", exc)
+            return None
+        return SessionBattery(event, soc, before, during)
+
+    return check
+
+
 def process(
     snapshot: Snapshot, state: State | None, now: datetime, points_per_pound: float = 800
 ) -> tuple[State, list[tuple[str, str, str]]]:
@@ -382,7 +501,7 @@ def _result_text(outcome: Outcome) -> str:
     return f"{outcome.points} pts"
 
 
-def display(snapshot: Snapshot, now: datetime) -> dict[str, str]:
+def display(snapshot: Snapshot, now: datetime, battery: SessionBattery | None = None) -> dict[str, str]:
     """Status fields for ``sessions.json`` (see ``docs/octopus-sessions.md``)."""
     upcoming = sorted(snapshot.upcoming, key=lambda e: e.start)
     nxt = upcoming[0] if upcoming else None
@@ -398,6 +517,7 @@ def display(snapshot: Snapshot, now: datetime) -> dict[str, str]:
         "meter": {"import": "import", "export": "EXPORT (wrong)", "other": "other (wrong)"}.get(
             snapshot.signed_up_meter or "", "-"
         ),
+        "battery": battery_display(battery),
     }
 
 
@@ -426,13 +546,26 @@ def main() -> None:
         now,
     )
     state, alerts = process(snapshot, State.load(state_file), now, env_float("OCTOPOINTS_PER_POUND", 800))
+    outlook = None
+    if env_str("BATTERY_KWH", "") and outputs.vm_url:
+        more, outlook = battery_alerts(
+            snapshot,
+            state,
+            now,
+            vm_battery_check(Settings.from_env(), outputs.vm_url),
+            env_float("SESSION_BATTERY_HOURS", 8),
+            env_float("SESSION_SHORTFALL_KWH", 0.2),
+        )
+        alerts += more
     notifier = Notifier(outputs.ntfy_url)
     for title, message, priority in alerts:
         log.info("%s: %s", title, message)
         notifier.send(title, message, priority=priority, tags="zap")
     state.save(state_file)
     write_status(
-        outputs.status_dir, "sessions", display(snapshot, now) | {"checked": f"{datetime.now():%H:%M}"}
+        outputs.status_dir,
+        "sessions",
+        display(snapshot, now, outlook) | {"checked": f"{datetime.now():%H:%M}"},
     )
 
 

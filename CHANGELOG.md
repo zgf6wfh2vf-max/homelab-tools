@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.0
+
+* `octopus-sessions`: optional battery check. For a joined Power Down starting within 8 hours, it
+  simulates the battery from its current charge (the `battery-check` model: typical house use per
+  half-hour and the saved solar forecast) and warns once if the session would need grid power. New
+  status field `battery`; turned on by setting `BATTERY_KWH` and `VM_URL`.
+* `battery-check`: the simulation can start from any charge at any half-hour (`outlook_between`).
+
 ## 0.12.1
 
 * `solar-forecast`: a dropped connection or 5xx from Forecast.Solar is retried once after 30

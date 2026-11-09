@@ -7,6 +7,10 @@ time-of-use tariff: a dull day tomorrow is a reason to charge the battery from t
 The free API needs no account and allows 12 requests an hour per IP address; this tool makes one
 request per roof plane per run, so an hourly timer is comfortable.
 
+If Forecast.Solar drops the connection or answers with a server error (5xx), the request is tried
+once more after 30 seconds, so a brief hiccup doesn't fail the run and trigger a `host-health`
+failed-unit alert. Client errors such as 429 (rate limit) are not retried.
+
 ## Settings
 
 | Setting | Default | Meaning |

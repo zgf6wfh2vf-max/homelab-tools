@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.1
+
+* `solar-forecast`: a dropped connection or 5xx from Forecast.Solar is retried once after 30
+  seconds instead of failing the run (which showed up as a failed unit and a `host-health` alert).
+  Rate-limit and other client errors are not retried.
+
 ## 0.12.0
 
 * `octopus-sessions`: checks which meter the saving-sessions sign-up is registered against, and

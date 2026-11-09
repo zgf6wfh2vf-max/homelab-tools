@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import http.client
+import io
 import json
+import urllib.error
+import urllib.request
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -13,6 +17,7 @@ from homelab_tools.forecast.solar import (
     combine,
     curve_samples,
     estimate_url,
+    http_json,
     latest_value,
     load_curve,
     parse_planes,
@@ -153,3 +158,47 @@ def test_run_saves_the_full_curve_every_time(tmp_path, http) -> None:
     curve.write_text('{"something": "else"}')
     with pytest.raises(ValueError, match="not a forecast curve"):
         load_curve(curve)
+
+
+class _Resp(io.BytesIO):
+    def __enter__(self) -> _Resp:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+
+def test_http_json_retries_once_after_a_dropped_connection(monkeypatch) -> None:
+    calls: list[str] = []
+    waits: list[float] = []
+
+    def urlopen(url: str, timeout: float) -> _Resp:
+        calls.append(url)
+        if len(calls) == 1:
+            raise http.client.RemoteDisconnected("Remote end closed connection without response")
+        return _Resp(b'{"ok": 1}')
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    assert http_json("https://x/estimate", sleep=waits.append) == {"ok": 1}
+    assert len(calls) == 2 and waits == [30]
+
+
+def test_http_json_gives_up_after_two_failures_and_never_retries_429(monkeypatch) -> None:
+    calls: list[int] = []
+
+    def failing(code: int):
+        def urlopen(url: str, timeout: float) -> _Resp:
+            calls.append(code)
+            raise urllib.error.HTTPError(url, code, "err", {}, None)  # type: ignore[arg-type]
+
+        return urlopen
+
+    monkeypatch.setattr(urllib.request, "urlopen", failing(502))
+    with pytest.raises(urllib.error.HTTPError):
+        http_json("https://x/estimate", sleep=lambda s: None)
+    assert calls == [502, 502]
+    calls.clear()
+    monkeypatch.setattr(urllib.request, "urlopen", failing(429))
+    with pytest.raises(urllib.error.HTTPError):
+        http_json("https://x/estimate", sleep=lambda s: None)
+    assert calls == [429]

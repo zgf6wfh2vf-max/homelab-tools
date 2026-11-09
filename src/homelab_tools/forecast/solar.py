@@ -31,6 +31,8 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterable
@@ -85,11 +87,32 @@ def estimate_url(lat: float, lon: float, plane: Plane, api_key: str = "") -> str
     return f"{API}{key}/estimate/{lat:g}/{lon:g}/{plane.tilt:g}/{plane.azimuth:g}/{plane.kwp:g}?time=iso8601"
 
 
-def http_json(url: str) -> dict[str, Any]:
-    """Default fetcher: GET and decode JSON."""
-    with urllib.request.urlopen(url, timeout=30) as resp:
-        result: dict[str, Any] = json.load(resp)
-        return result
+RETRY_WAIT_S = 30
+
+
+def http_json(url: str, sleep: Callable[[float], None] = time.sleep) -> dict[str, Any]:
+    """Default fetcher: GET and decode JSON, trying a second time after a dropped connection.
+
+    Forecast.Solar occasionally closes the connection or answers 5xx; one retry after
+    ``RETRY_WAIT_S`` seconds stops that becoming a failed run (and a host-health alert).
+    Client errors such as 429 (rate limit) are not retried: a retry would only use more of the
+    hourly allowance.
+    """
+    for attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(url, timeout=30) as resp:
+                result: dict[str, Any] = json.load(resp)
+                return result
+        except urllib.error.HTTPError as exc:
+            if attempt == 2 or exc.code < 500:
+                raise
+            log.info("Forecast.Solar answered %s; trying again in %ds", exc.code, RETRY_WAIT_S)
+        except OSError as exc:
+            if attempt == 2:
+                raise
+            log.info("Forecast.Solar request failed (%s); trying again in %ds", exc, RETRY_WAIT_S)
+        sleep(RETRY_WAIT_S)
+    raise AssertionError("unreachable")
 
 
 @dataclass(frozen=True)

@@ -303,6 +303,30 @@ def speed_test(
     return SpeedTest(now, round(down, 1), round(up, 1), round(min(pings), 1) if pings else None)
 
 
+RETRY_WAIT_S = 60
+
+
+def speed_test_retrying(
+    test: Callable[[float], SpeedTest] = speed_test,
+    clock: Callable[[], float] = time.time,
+    sleep: Callable[[float], None] = time.sleep,
+) -> SpeedTest:
+    """Run a speed test, and once more after ``RETRY_WAIT_S`` seconds if it fails.
+
+    Cloudflare's speed-test servers sometimes answer ``502 Bad Gateway``; a second try a minute
+    later nearly always works, so one bad answer no longer costs the measurement.
+
+    Raises:
+        OSError: If both attempts fail.
+    """
+    try:
+        return test(clock())
+    except OSError as exc:
+        log.info("speed test failed (%s); trying again in %ds", exc, RETRY_WAIT_S)
+    sleep(RETRY_WAIT_S)
+    return test(clock())
+
+
 @dataclass
 class SpeedState:
     """Kept by ``speedtest``: past results and whether a slow-line alert is open."""
@@ -510,13 +534,13 @@ def watch(outputs: Outputs, settings: Settings) -> None:
 
 def speedtest(outputs: Outputs, settings: Settings) -> None:
     """Run one speed test."""
-    now = time.time()
     state = SpeedState.load(settings.speed_file)
     try:
-        test = speed_test(now)
+        test = speed_test_retrying()
     except OSError as exc:
-        log.warning("speed test failed: %s", exc)
+        log.warning("speed test failed twice: %s", exc)
         return
+    now = test.time
     log.info("download %.1f Mbps, upload %.1f Mbps, ping %s ms", test.download, test.upload, test.ping)
     alerts = record_test(state, test, settings.min_down)
     state.save(settings.speed_file)

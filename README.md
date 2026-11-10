@@ -30,6 +30,18 @@ flowchart LR
   tools --> J[status JSON] --> D[Homepage]
 ```
 
+## Screenshots
+
+The Homepage dashboard, fed by the status files (location hidden):
+
+![Homepage Energy tab: solar, battery, grid, outlook, insights, sessions, bills and car cards](docs/images/homepage.png)
+
+Grafana dashboards from the metrics in VictoriaMetrics (see [dashboards](docs/dashboards.md)):
+
+| Solar and battery, last 24 hours | Costs, last 30 days | Heating, last 24 hours |
+|---|---|---|
+| ![Solar dashboard](docs/images/grafana-solar.png) | ![Costs dashboard](docs/images/grafana-costs.png) | ![Heating dashboard](docs/images/grafana-heating.png) |
+
 ## Tools
 
 | Tool | What it does | Doc |

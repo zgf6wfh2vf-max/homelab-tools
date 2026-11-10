@@ -34,6 +34,9 @@ seconds and uploads for about 10 seconds over four parallel connections. Each co
 warm-up transfer first, which isn't counted. A test uses roughly as many megabytes as your speed in
 Mbps (about 150 MB on a 150 Mbps line), so four tests a day come to a few GB a month.
 
+Cloudflare's servers sometimes answer `502 Bad Gateway`. A failed test is tried once more a minute
+later; only if that fails too is the run skipped (it logs "speed test failed twice").
+
 **Where you run it matters.** A test measures everything between the machine and Cloudflare. If
 the machine reaches the router over powerline, Wi-Fi or a mesh link, that hop is usually slower than
 a fast fibre line, so the test measures the hop and not the broadband. (A Magic 2 powerline pair

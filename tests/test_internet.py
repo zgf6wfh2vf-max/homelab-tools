@@ -22,6 +22,7 @@ from homelab_tools.internet.monitor import (
     record_test,
     run_streams,
     speed_test,
+    speed_test_retrying,
     step,
 )
 
@@ -176,3 +177,21 @@ def test_monthly_report() -> None:
 
 
 DAY_S = 86400
+
+
+def test_speed_test_is_tried_once_more_after_a_failure() -> None:
+    attempts: list[float] = []
+    waits: list[float] = []
+    clock = iter([100.0, 160.0, 300.0, 360.0])
+
+    def flaky(now: float) -> SpeedTest:
+        attempts.append(now)
+        if len(attempts) in (1, 3, 4):
+            raise OSError("HTTP Error 502: Bad Gateway")
+        return SpeedTest(now, 300.0, 100.0, 9.0)
+
+    result = speed_test_retrying(flaky, lambda: next(clock), waits.append)
+    assert result.time == 160.0 and attempts == [100.0, 160.0] and waits == [60]
+    with pytest.raises(OSError, match="502"):  # fails twice: give up
+        speed_test_retrying(flaky, lambda: next(clock), waits.append)
+    assert attempts[2:] == [300.0, 360.0]

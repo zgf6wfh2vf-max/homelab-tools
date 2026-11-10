@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.1
+
+* `internet-monitor speedtest`: a failed test (e.g. Cloudflare answering `502 Bad Gateway`) is tried
+  once more a minute later instead of losing that measurement.
+
 ## 0.13.0
 
 * `octopus-sessions`: optional battery check. For a joined Power Down starting within 8 hours, it

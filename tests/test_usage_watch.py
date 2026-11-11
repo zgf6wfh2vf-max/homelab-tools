@@ -16,6 +16,7 @@ from homelab_tools.usage.watch import (
     check_gas,
     daily_temperatures,
     daily_totals,
+    gas_samples,
 )
 
 
@@ -113,7 +114,7 @@ def test_check_baseload() -> None:
     assert check_baseload(dict(list(loads.items())[:5]), 1.5, 100) is None
 
 
-def make_watch(gas_days: dict[date, float], temps: dict, load_rows, state: State) -> Watch:
+def make_watch(gas_days: dict[date, float], temps: dict, load_rows, state: State, metrics=None) -> Watch:
     series = {}
     for day, kwh in gas_days.items():
         series |= slots_for(day, kwh / 48)
@@ -122,6 +123,7 @@ def make_watch(gas_days: dict[date, float], temps: dict, load_rows, state: State
         history=lambda expr, start, end, step: load_rows,
         temperatures=lambda s, e: temps,
         state=state,
+        metrics=metrics,
     )
 
 
@@ -171,3 +173,31 @@ def test_baseload_says_when_it_will_start() -> None:
     )
     assert status["base_now"] == "learning"
     assert status["base_usual"] == f"from {last + timedelta(days=3):%a %-d %b}"
+
+
+def test_gas_samples_use_only_earlier_days_so_a_lasting_change_shows() -> None:
+    gas, temps = history(days=100)
+    days = sorted(gas)
+    for day in days[-10:]:
+        gas[day] *= 0.8  # a new boiler setting saves 20 % from here on
+    samples = gas_samples(gas, temps, days=12)
+    assert len(samples) == 12
+    first = samples[0]
+    assert first.time == datetime.combine(days[-12], time()).astimezone() and first.measurement == "usage"
+    model = GasModel.fit({d: gas[d] for d in days[:-12]}, temps)
+    assert model and first.fields["gas_expected_kwh"] == round(model.predict(temps[days[-12]]), 2)
+    later = samples[-10:]
+    used = sum(float(s.fields["gas_kwh"] or 0) for s in later)
+    expected = sum(float(s.fields["gas_expected_kwh"] or 0) for s in later)
+    assert 0.75 < used / expected < 0.85  # the 20 % saving shows; it isn't absorbed by the fit
+    assert gas_samples(gas, temps, days=200)[0].time == datetime.combine(days[60], time()).astimezone()
+
+
+def test_watch_writes_the_gas_chart_every_run() -> None:
+    gas, temps = history()
+    written: list = []
+    state = State(gas_checked=max(gas).isoformat())  # nothing new to check
+    make_watch(gas, temps, [], state, metrics=written.append).run(
+        datetime.combine(max(gas) + timedelta(days=1), time(10)).astimezone()
+    )
+    assert len(written) == 1 and len(written[0]) == 60

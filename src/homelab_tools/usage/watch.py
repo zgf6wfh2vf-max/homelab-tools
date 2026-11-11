@@ -9,7 +9,9 @@ from Open-Meteo (free, no account), and the best ``base`` between 12 and 18 °C 
 flagged when it used more than ``GAS_SIGMA`` standard deviations above the model's prediction,
 *and* at least ``GAS_MIN_EXCESS_PCT`` % and ``GAS_MIN_EXCESS_KWH`` more: a boiler or thermostat
 problem, a heating schedule left on, a hot-water fault. Octopus data arrives a day or two late, so
-each new complete day is checked once.
+each new complete day is checked once. Each run also writes the last ``GAS_CHART_DAYS`` days of
+used and expected gas to VictoriaMetrics (``usage_gas_kwh``, ``usage_gas_expected_kwh``) for a
+Grafana chart, so the effect of a heating change shows up against the weather.
 
 **Electricity always-on load.** Each day's *baseload* is the average of its six quietest half-hours
 of house power (``solis_load_w`` by default): fridges, routers, standby. When the baseload is
@@ -37,7 +39,7 @@ from pathlib import Path
 from typing import Any
 
 from homelab_tools.common.config import Outputs, env_float, env_str
-from homelab_tools.common.metrics import RangeQuery, vm_range
+from homelab_tools.common.metrics import RangeQuery, Sample, VictoriaMetrics, vm_range
 from homelab_tools.common.notify import Notifier
 from homelab_tools.common.status import write_status
 from homelab_tools.octopus.compare import Series, vm_series
@@ -146,6 +148,30 @@ class GasModel:
             if best is None or sd < best.sd:
                 best = cls(float(base), a, b, sd, len(days))
         return best
+
+
+def gas_samples(
+    gas: Mapping[date, float], temps: Mapping[date, float], days: int, measurement: str = "usage"
+) -> list[Sample]:
+    """Used and expected gas for the newest ``days`` days, timestamped at local midnight.
+
+    Each day's expectation comes from a model fitted only to the days *before* it, so a lasting
+    change (a new boiler setting, insulation) shows as a gap instead of being absorbed by the fit.
+    """
+    known = sorted(d for d in gas if d in temps)
+    samples = []
+    for day in known[-days:]:
+        model = GasModel.fit({d: gas[d] for d in known if d < day}, temps)
+        if model is None:
+            continue
+        midnight = datetime.combine(day, datetime.min.time()).astimezone()
+        fields = {
+            "gas_kwh": round(gas[day], 2),
+            "gas_expected_kwh": round(model.predict(temps[day]), 2),
+            "gas_outside_c": round(temps[day], 1),
+        }
+        samples.append(Sample(measurement, fields, time=midnight))
+    return samples
 
 
 @dataclass(frozen=True)
@@ -299,6 +325,8 @@ class Watch:
         min_kwh: Gas threshold in kWh above the prediction.
         factor: Baseload threshold as a multiple of usual.
         min_w: Baseload threshold as watts above usual.
+        metrics: Writes samples (the daily used/expected gas chart); ``None`` writes nothing.
+        chart_days: Days of used/expected gas to (re)write each run.
     """
 
     series: Series
@@ -312,6 +340,8 @@ class Watch:
     min_kwh: float = 5.0
     factor: float = 1.5
     min_w: float = 100.0
+    metrics: Callable[[list[Sample]], object] | None = None
+    chart_days: int = 60
 
     def run(self, now: datetime) -> tuple[list[Alert], dict[str, str]]:
         """Check new gas days and the electricity baseload; returns alerts and status fields."""
@@ -329,6 +359,8 @@ class Watch:
         if not gas or self.temperatures is None:
             return []
         temps = self.temperatures(min(gas), max(gas))
+        if self.metrics:
+            self.metrics(gas_samples(gas, temps, self.chart_days))
         new = [d for d in sorted(gas) if d.isoformat() > self.state.gas_checked and d in temps]
         if not self.state.gas_checked:
             new = new[-1:]  # first run: start from the newest day, don't replay a year of history
@@ -390,6 +422,12 @@ def main() -> None:
     state_file = Path(env_str("USAGE_STATE_FILE", "/var/lib/usage-watch/state.json"))
     lat, lon = env_str("WEATHER_LAT", ""), env_str("WEATHER_LON", "")
     temperatures = (lambda s, e: daily_temperatures(float(lat), float(lon), s, e)) if lat and lon else None
+    vm = VictoriaMetrics(vm_url)
+
+    def write_chart(samples: list[Sample]) -> None:
+        if not args.dry_run and vm.write(samples):
+            vm.reset_cache()  # backdated samples: drop cached query results
+
     watch = Watch(
         series=vm_series(vm_url),
         history=vm_range(vm_url),
@@ -402,6 +440,8 @@ def main() -> None:
         min_kwh=env_float("GAS_MIN_EXCESS_KWH", 5.0),
         factor=env_float("BASELOAD_FACTOR", 1.5),
         min_w=env_float("BASELOAD_MIN_W", 100.0),
+        metrics=write_chart,
+        chart_days=int(env_float("GAS_CHART_DAYS", 60)),
     )
     alerts, status = watch.run(datetime.now().astimezone())
     if args.dry_run:

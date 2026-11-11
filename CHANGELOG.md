@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.0
+
+* `usage-watch`: writes the last 60 days of used and expected gas to VictoriaMetrics
+  (`usage_gas_kwh`, `usage_gas_expected_kwh`, `usage_gas_outside_c`; `GAS_CHART_DAYS`). Each day is
+  compared with a model fitted only to earlier days, so a lasting heating change shows up.
+* Grafana Heating dashboard: "Gas used vs expected for the weather", the daily difference in kWh, and
+  the past week against expected (%).
+
 ## 0.13.1
 
 * `internet-monitor speedtest`: a failed test (e.g. Cloudflare answering `502 Bad Gateway`) is tried

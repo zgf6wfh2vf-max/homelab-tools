@@ -31,6 +31,16 @@ A day is flagged only when **all three** thresholds are passed:
 Octopus data arrives a day or two late, so each new complete day is checked once. The first run
 checks only the newest day, rather than replaying a year of history.
 
+### Chart: did a heating change help?
+
+Each run also writes the last `GAS_CHART_DAYS` (60) days to VictoriaMetrics as `usage_gas_kwh`,
+`usage_gas_expected_kwh` and `usage_gas_outside_c`, timestamped at local midnight. Each day's
+expected figure comes from a model fitted only to the days *before* it. A lasting change to the
+heating (a lower boiler flow temperature, new insulation, a different schedule) therefore shows as a
+gap between the bars and the line, rather than being absorbed by the fit. The
+[Heating dashboard](dashboards.md) charts used against expected, the daily difference in kWh, and the
+past week overall. Mark the day of a change with a Grafana annotation (Ctrl+click on the chart).
+
 ## Electricity always-on load
 
 Each day's **baseload** is the average of its six quietest half-hours of house power: fridges,
@@ -52,6 +62,7 @@ then a low-priority "back to normal" when it recovers. It needs 7 days of histor
 | `GAS_MIN_EXCESS_KWH` | 5 | Gas threshold in kWh above the prediction |
 | `BASELOAD_FACTOR` | 1.5 | Baseload threshold as a multiple of usual |
 | `BASELOAD_MIN_W` | 100 | Baseload threshold in W above usual |
+| `GAS_CHART_DAYS` | 60 | Days of used/expected gas written for the Grafana chart |
 | `USAGE_STATE_FILE` | `/var/lib/usage-watch/state.json` | Last gas day checked; whether a baseload alert is open |
 | `NTFY_URL`, `STATUS_DIR` | - | Outputs (see [installation](installation.md)) |
 

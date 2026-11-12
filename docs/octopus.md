@@ -7,19 +7,24 @@ as Octopus Go or Agile, tariff switches mid-month, and daily standing charges.
 ## Setup
 
 1. Get your API key at <https://octopus.energy/dashboard/new/accounts/personal-details/api-access>.
-   It gives read access to your account data. Store it in a file:
+   It gives read access to your account data. Store it in a file readable only by root and the
+   service group (pasting it into the editor keeps it out of your shell history):
    ```sh
-   echo 'sk_live_...' | sudo install -m 640 -o root -g homelab /dev/stdin /etc/homelab-tools/octopus-api-key
+   sudo install -m 640 -o root -g homelab /dev/null /etc/homelab-tools/octopus-api-key
+   sudoedit /etc/homelab-tools/octopus-api-key      # paste the key, save
    ```
 2. Generate the meter config (MPANs, meter serials, tariff agreements) from your account number:
    ```sh
-   sudo OCTOPUS_API_KEY="$(sudo cat /etc/homelab-tools/octopus-api-key)" \
-     /opt/homelab-tools/bin/octopus-setup A-XXXXXXXX | sudo tee /etc/homelab-tools/octopus.json
+   sudo install -m 640 -o root -g homelab /dev/null /etc/homelab-tools/octopus.json
+   sudo sh -c 'OCTOPUS_API_KEY_FILE=/etc/homelab-tools/octopus-api-key \
+     /opt/homelab-tools/bin/octopus-setup A-XXXXXXXX > /etc/homelab-tools/octopus.json'
    ```
+   The file holds your meter numbers (MPANs) and tariffs, so it is kept private too.
    Re-run this when your tariff changes.
 3. Backfill history once (Octopus usually holds about two years):
    ```sh
-   sudo -u homelab env $(sudo cat /etc/homelab-tools/octopus-collector.env | xargs) \
+   sudo systemd-run --wait --pipe --uid=homelab --gid=homelab \
+     -p EnvironmentFile=/etc/homelab-tools/octopus-collector.env \
      /opt/homelab-tools/bin/octopus-collector --days 800
    ```
 4. Enable the timer (every 3 hours): `sudo systemctl enable --now octopus-collector.timer`.

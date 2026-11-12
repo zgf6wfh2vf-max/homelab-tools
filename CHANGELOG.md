@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.2
+
+* `octopus-setup` reads the API key from `OCTOPUS_API_KEY_FILE`, like the other Octopus tools,
+  so the key stays off the command line.
+* Docs: a safer, complete README quick start (service user, private settings, and how to keep it
+  safe). Secrets are added with `sudoedit` instead of on the command line or in shell history; the
+  Octopus meter config is created private; the example `.env` files all use
+  `/etc/homelab-tools/octopus.json`.
+
 ## 0.15.1
 
 * `restic-restore-test` and `pihole-threat-alert` close their SQLite connections, and the

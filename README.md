@@ -74,17 +74,72 @@ Ready-made Grafana dashboards and a Homepage layout are in [`examples/`](example
 
 ## Quick start
 
+Each tool is independent: pick the one you want. The examples below use Octopus Energy's
+saving-session alerts (`octopus-sessions`), which only need an Octopus account and the
+[ntfy](https://ntfy.sh) app on your phone.
+
+### 1. Try it (nothing installed system-wide, nothing saved)
+
 ```sh
-sudo python3 -m venv /opt/homelab-tools
-sudo /opt/homelab-tools/bin/pip install "homelab-tools[podpoint] @ git+https://github.com/zgf6wfh2vf-max/homelab-tools"
-sudo install -d -m 750 /etc/homelab-tools
-sudo cp examples/env/solis-monitor.env.example /etc/homelab-tools/solis-monitor.env   # then edit it
-sudo cp examples/systemd/solis-monitor.service /etc/systemd/system/
-sudo systemctl enable --now solis-monitor
+git clone https://github.com/zgf6wfh2vf-max/homelab-tools && cd homelab-tools
+python3 -m venv .venv && .venv/bin/pip install .
+read -rs OCTOPUS_API_KEY && export OCTOPUS_API_KEY   # paste your API key: not shown, not in history
+.venv/bin/octopus-setup A-XXXXXXXX                   # your account number; prints your meters and tariffs
 ```
 
-The full walkthrough (service user, status directory, VictoriaMetrics + Grafana, timers) is in
+The API key is on your Octopus dashboard under
+[Personal details → API access](https://octopus.energy/dashboard/new/accounts/personal-details/api-access).
+It gives read access to your account. `octopus-setup` only reads, and prints what the other Octopus
+tools will use.
+
+### 2. Run it as a service
+
+From the cloned folder:
+
+```sh
+# Install into its own environment, with an unprivileged service user
+sudo python3 -m venv /opt/homelab-tools
+sudo /opt/homelab-tools/bin/pip install "homelab-tools @ git+https://github.com/zgf6wfh2vf-max/homelab-tools"
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin homelab
+sudo install -d -m 750 -o root -g homelab /etc/homelab-tools        # settings and secrets
+sudo install -d -m 775 -o root -g homelab /var/lib/homelab-status   # dashboard status files
+
+# Secrets go in files only root and the service can read; paste them in the editor
+sudo install -m 640 -o root -g homelab /dev/null /etc/homelab-tools/octopus-api-key
+sudoedit /etc/homelab-tools/octopus-api-key                         # paste the key, save
+sudo install -m 640 -o root -g homelab /dev/null /etc/homelab-tools/octopus.json
+sudo sh -c 'OCTOPUS_API_KEY_FILE=/etc/homelab-tools/octopus-api-key \
+  /opt/homelab-tools/bin/octopus-setup A-XXXXXXXX > /etc/homelab-tools/octopus.json'
+
+# Settings: set NTFY_URL to your own long, random topic
+sudo install -m 640 -o root -g homelab examples/env/octopus-sessions.env.example \
+  /etc/homelab-tools/octopus-sessions.env
+sudoedit /etc/homelab-tools/octopus-sessions.env
+
+# Check every 30 minutes
+sudo cp examples/systemd/octopus-sessions.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now octopus-sessions.timer
+journalctl -u octopus-sessions -f                                   # watch the first run
+```
+
+Subscribe to the same topic in the ntfy app to get the alerts. Other tools follow the same pattern:
+an `.env` file from [`examples/env/`](examples/env) and a unit from
+[`examples/systemd/`](examples/systemd). Each tool's doc lists its settings. The full walkthrough
+(VictoriaMetrics and Grafana, the Homepage dashboard, every tool) is in
 [docs/installation.md](docs/installation.md).
+
+### Keeping it safe
+
+* **Your ntfy topic works like a password.** Anyone who knows it can read your alerts and send you
+  fake ones. Use a long random name (`openssl rand -hex 16`), or self-host ntfy with access control.
+* **Secrets stay in files**, owned by root and readable only by the `homelab` group (mode 640).
+  They never go in unit files or on the command line, where other users could see them in the
+  process list.
+* **Keep dashboards on your home network.** Status files, VictoriaMetrics and Grafana show when
+  you're home and how you use energy. Don't forward ports to them; use a VPN such as Tailscale or
+  WireGuard to see them away from home.
+* The services run as an unprivileged user with a read-only view of the system, and the tools only
+  read from your devices and accounts. See [SECURITY.md](SECURITY.md).
 
 ## Design principles
 

@@ -2,7 +2,10 @@
 
 Usage::
 
-    OCTOPUS_API_KEY=sk_live_... octopus-setup A-1234ABCD > /etc/octopus/config.json
+    OCTOPUS_API_KEY_FILE=/etc/homelab-tools/octopus-api-key octopus-setup A-1234ABCD > config.json
+
+``OCTOPUS_API_KEY`` (the key itself) also works, but a file keeps the key off the command line,
+where other users could see it in the process list.
 
 The account number is on your bills and the dashboard. Re-run it when your tariff changes - the
 collector prices each half-hour with the agreement that was in force at the time.
@@ -14,8 +17,8 @@ import json
 import sys
 from typing import Any
 
-from homelab_tools.common.config import env_str
 from homelab_tools.octopus.api import JSON, OctopusClient
+from homelab_tools.octopus.collector import load_key
 
 
 def build_config(account: JSON, number: str) -> dict[str, Any]:
@@ -53,9 +56,9 @@ def build_config(account: JSON, number: str) -> dict[str, Any]:
 def main() -> None:
     """Entry point: print the config JSON for the account given on the command line."""
     if len(sys.argv) != 2:
-        sys.exit("usage: OCTOPUS_API_KEY=... octopus-setup <account number, e.g. A-1234ABCD>")
+        sys.exit("usage: OCTOPUS_API_KEY_FILE=... octopus-setup <account number, e.g. A-1234ABCD>")
     number = sys.argv[1]
-    client = OctopusClient(env_str("OCTOPUS_API_KEY"))
+    client = OctopusClient(load_key())
     print(json.dumps(build_config(client.account(number), number), indent=1))
 
 

@@ -26,9 +26,13 @@ holding off for its schedule. The monitor reads the connector's charging state i
 
 ## Setup
 
+Put your Pod Point app email on the first line and its password on the second, in a file readable
+only by root and the service group (typing them into the editor keeps the password out of your
+shell history):
+
 ```sh
-printf '%s\n%s\n' 'you@example.com' 'app-password' \
-  | sudo install -m 640 -o root -g homelab /dev/stdin /etc/homelab-tools/podpoint-credentials
+sudo install -m 640 -o root -g homelab /dev/null /etc/homelab-tools/podpoint-credentials
+sudoedit /etc/homelab-tools/podpoint-credentials
 ```
 
 On the first run the whole charging history is written to VictoriaMetrics (nothing is announced).

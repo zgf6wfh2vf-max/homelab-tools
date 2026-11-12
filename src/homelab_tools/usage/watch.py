@@ -19,6 +19,13 @@ of house power (``solis_load_w`` by default): fridges, routers, standby. When th
 ``BASELOAD_MIN_W`` higher, on two days running, something has probably been left on - a heater, a
 dehumidifier, a failing appliance. One alert, then a "back to normal" message when it recovers.
 
+**Heating warm-up.** Each time a tado zone's target is raised (a schedule block starting), the
+time the room takes to reach it is measured (see :mod:`homelab_tools.usage.warmup`) and written to
+VictoriaMetrics (``heating_warmup_min``). A warm-up that takes ``WARMUP_FACTOR`` times the zone's
+usual (the median of the previous two weeks) and ``WARMUP_MIN_EXTRA_MIN`` minutes longer, or never
+reaches the target, is reported: an early sign that the boiler's flow temperature is too low for
+the weather.
+
 Settings (environment): ``VM_URL`` (required), ``WEATHER_LAT`` / ``WEATHER_LON`` (required for the
 gas check), ``NTFY_URL``, ``STATUS_DIR`` and the thresholds in ``docs/usage-watch.md``.
 """
@@ -44,6 +51,16 @@ from homelab_tools.common.notify import Notifier
 from homelab_tools.common.status import write_status
 from homelab_tools.octopus.compare import Series, vm_series
 from homelab_tools.octopus.pricing import local_day
+from homelab_tools.tado.model import zone_key
+from homelab_tools.usage.warmup import (
+    Warmup,
+    ZoneSeries,
+    duration,
+    find_warmups,
+    is_slow,
+    usual_minutes,
+    vm_zone_series,
+)
 
 log = logging.getLogger("usage-watch")
 
@@ -174,6 +191,21 @@ def gas_samples(
     return samples
 
 
+#: Days of tado history read: enough for two weeks of "usual" before the oldest charted warm-up.
+WARMUP_HISTORY_DAYS = 35
+
+
+def warmup_sample(w: Warmup) -> Sample:
+    """A warm-up as a metric sample at its start time (``heating_warmup_min{zone=...}`` etc.)."""
+    fields = {
+        "warmup_min": None if w.minutes is None else round(w.minutes, 1),
+        "warmup_reached": w.minutes is not None,
+        "warmup_gap_c": round(w.target - w.start_temp, 2),
+        "warmup_outside_c": w.outside,
+    }
+    return Sample("heating", fields, {"zone": w.zone}, w.start)
+
+
 @dataclass(frozen=True)
 class GasCheck:
     """One day's gas against the model."""
@@ -257,11 +289,13 @@ class State:
         gas_checked: The last gas day checked (ISO date).
         baseload_high: Whether a high baseload has been reported and not yet cleared.
         gas_status: Dashboard fields from the last gas check, shown until the next day is checked.
+        warmup_checked: Start of the last heating warm-up checked (ISO timestamp).
     """
 
     gas_checked: str = ""
     baseload_high: bool = False
     gas_status: dict[str, str] = field(default_factory=dict)
+    warmup_checked: str = ""
 
     @classmethod
     def load(cls, path: Path) -> State:
@@ -272,6 +306,7 @@ class State:
                 str(data.get("gas_checked", "")),
                 bool(data.get("baseload_high", False)),
                 {str(k): str(v) for k, v in data.get("gas_status", {}).items()},
+                str(data.get("warmup_checked", "")),
             )
         except (OSError, ValueError):
             return cls()
@@ -291,6 +326,29 @@ def gas_alert(c: GasCheck) -> Alert:
         f"Unusual gas use {c.day:%a %-d %b}",
         f"{c.used:.0f} kWh used; about {c.expected:.0f} kWh is normal at {c.temperature:.1f} °C outside "
         f"({c.used - c.expected:.0f} kWh more). Worth checking the heating schedule, thermostat and boiler.",
+        "default",
+    )
+
+
+def warmup_alert(w: Warmup, usual: float) -> Alert:
+    """A warm-up that was much slower than usual, or never reached its target."""
+    start = w.start.astimezone()
+    outside = f", with {w.outside:.1f} °C outside" if w.outside is not None else ""
+    if w.minutes is None:
+        what = (
+            f"{w.zone} didn't reach {w.target:.1f} °C after the heating came on at {start:%a %H:%M}: "
+            f"it got to {w.best:.1f} °C from {w.start_temp:.1f} °C{outside}. It usually takes "
+            f"{duration(usual)}."
+        )
+    else:
+        what = (
+            f"{w.zone} took {duration(w.minutes)} to reach {w.target:.1f} °C from {w.start_temp:.1f} °C "
+            f"after {start:%a %H:%M} (usually {duration(usual)}){outside}."
+        )
+    return (
+        f"Slow to warm up: {w.zone}",
+        what + " If this keeps happening as it gets colder, the boiler's flow temperature or weather "
+        "curve may be too low, or a radiator valve may be stuck.",
         "default",
     )
 
@@ -342,6 +400,9 @@ class Watch:
     min_w: float = 100.0
     metrics: Callable[[list[Sample]], object] | None = None
     chart_days: int = 60
+    zones: ZoneSeries | None = None
+    warmup_factor: float = 1.5
+    warmup_min_extra: float = 45.0
 
     def run(self, now: datetime) -> tuple[list[Alert], dict[str, str]]:
         """Check new gas days and the electricity baseload; returns alerts and status fields."""
@@ -351,6 +412,8 @@ class Watch:
             alerts += self._gas(now, status)
             status.update(self.state.gas_status)  # the last gas day checked, even if none was new
         alerts += self._baseload(now, status)
+        if self.zones:
+            alerts += self._warmup(now, status)
         status["checked"] = f"{now:%d %b %H:%M}"
         return alerts, status
 
@@ -385,6 +448,45 @@ class Watch:
                 "gas_expected": f"{check.expected:.0f} kWh",
                 "gas_outside": f"{check.temperature:.1f} °C",
             }
+        return alerts
+
+    def _warmup(self, now: datetime, status: dict[str, str]) -> list[Alert]:
+        if self.zones is None:
+            return []
+        start = now - timedelta(days=WARMUP_HISTORY_DAYS)
+        inside = self.zones("tado_inside_c", start, now)
+        target = self.zones("tado_target_c", start, now)
+        outside = next(iter(self.zones("tado_weather_outside_c", start, now).values()), {})
+        warmups = sorted(
+            (w for zone in sorted(inside.keys() & target.keys())
+             for w in find_warmups(zone, inside[zone], target[zone], outside)),
+            key=lambda w: w.start,
+        )  # fmt: skip
+        if not warmups:
+            return []
+        if self.metrics:
+            self.metrics([warmup_sample(w) for w in warmups])
+        latest: dict[str, Warmup] = {w.zone: w for w in warmups}
+        status["warmup_when"] = f"{max(w.start for w in latest.values()).astimezone():%a %H:%M}"
+        for zone, w in latest.items():
+            usual = usual_minutes(warmups, w)
+            took = "not reached" if w.minutes is None else duration(w.minutes)
+            status[f"warmup_{zone_key(zone)}"] = f"{took} (usual {duration(usual) if usual else 'learning'})"
+        new = [w for w in warmups if w.start.isoformat() > self.state.warmup_checked]
+        first_run = not self.state.warmup_checked
+        self.state.warmup_checked = warmups[-1].start.isoformat()
+        if first_run:
+            return []  # don't replay old history
+        alerts = []
+        for w in new:
+            typical = usual_minutes(warmups, w)
+            log.info(
+                "warm-up %s %s: %s (usual %s)", w.zone, w.start.astimezone().strftime("%a %H:%M"),
+                duration(w.minutes) if w.minutes is not None else "not reached",
+                duration(typical) if typical is not None else "-",
+            )  # fmt: skip
+            if typical is not None and is_slow(w, typical, self.warmup_factor, self.warmup_min_extra):
+                alerts.append(warmup_alert(w, typical))
         return alerts
 
     def _baseload(self, now: datetime, status: dict[str, str]) -> list[Alert]:
@@ -442,6 +544,9 @@ def main() -> None:
         min_w=env_float("BASELOAD_MIN_W", 100.0),
         metrics=write_chart,
         chart_days=int(env_float("GAS_CHART_DAYS", 60)),
+        zones=vm_zone_series(vm_url) if env_str("WARMUP_CHECK", "1") != "0" else None,
+        warmup_factor=env_float("WARMUP_FACTOR", 1.5),
+        warmup_min_extra=env_float("WARMUP_MIN_EXTRA_MIN", 45.0),
     )
     alerts, status = watch.run(datetime.now().astimezone())
     if args.dry_run:

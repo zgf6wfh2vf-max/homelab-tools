@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.0
+
+* `usage-watch`: heating warm-up check. Each time a tado zone's target is raised, it measures how
+  long the room takes to reach it, writes `heating_warmup_min{zone}` and friends to VictoriaMetrics,
+  and alerts when a warm-up takes 1.5x the zone's usual and 45 minutes longer, or never gets there
+  (`WARMUP_FACTOR`, `WARMUP_MIN_EXTRA_MIN`, `WARMUP_CHECK`). New `usage.json` fields `warmup_when`
+  and `warmup_<zone>`.
+* Grafana Heating dashboard: "Warm-up time after the heating comes on".
+
 ## 0.14.0
 
 * `usage-watch`: writes the last 60 days of used and expected gas to VictoriaMetrics

@@ -10,7 +10,7 @@ Prometheus-type data source with uid `vm` pointing at VictoriaMetrics
 |---|---|---|
 | `solar.json` | solis-monitor | Live power, power flows, battery charge, inverter temperature, grid voltage, daily energy |
 | `costs.json` | octopus-collector (+ podpoint-monitor for the car row) | Import / export / gas / standing costs, daily cost bars, off-peak share, solar saving, car charging |
-| `heating.json` | tado-monitor (+ octopus-collector) | Room vs target vs outside temperature, heating demand, humidity, gas vs heating per day, gas used vs expected for the weather (usage-watch) |
+| `heating.json` | tado-monitor (+ octopus-collector) | Room vs target vs outside temperature, heating demand, humidity, gas vs heating per day, gas used vs expected for the weather, warm-up time per zone (usage-watch) |
 | `network.json` | internet-monitor, powerline-monitor | Online/offline timeline for the internet and router, latency, speed tests, powerline link speed, lost MAPs and adapter status |
 | `server.json` | host-health with `VM_URL` | CPU temperature (with the fan and throttling points marked), hottest in 7 days, fan speed, throttling, memory, SD-card writes, open problems |
 | `embed.json` | the above | Small transparent panels for embedding in other pages |

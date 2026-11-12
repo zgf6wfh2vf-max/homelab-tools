@@ -70,7 +70,10 @@ def documented(page: str) -> str:
         ("host-health.md", [*host_display(None, None, [], None, Finding("memory", None)), "checked"]),
         (
             "usage-watch.md",
-            ["gas_day", "gas_used", "gas_expected", "gas_outside", "base_now", "base_usual", "checked"],
+            [
+                *("gas_day", "gas_used", "gas_expected", "gas_outside", "base_now", "base_usual"),
+                *("warmup_when", "checked"),
+            ],
         ),
         ("internet-monitor.md", [*internet_display(LineState(), SpeedState(), 0), "checked"]),
         ("ipv6-watch.md", [*ipv6_display([], {}), "checked"]),

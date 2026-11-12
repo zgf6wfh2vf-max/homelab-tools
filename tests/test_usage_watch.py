@@ -201,3 +201,35 @@ def test_watch_writes_the_gas_chart_every_run() -> None:
         datetime.combine(max(gas) + timedelta(days=1), time(10)).astimezone()
     )
     assert len(written) == 1 and len(written[0]) == 60
+
+
+def test_watch_warmups_learn_quietly_first_then_alert_on_a_slow_morning() -> None:
+    from test_usage_warmup import morning
+
+    inside: dict = {}
+    target: dict = {}
+    for day in range(8):
+        i, t = morning(day, 150)
+        inside |= i
+        target |= t
+    zones = {"tado_inside_c": {"Upstairs": inside}, "tado_target_c": {"Upstairs": target}}
+    state = State(gas_checked="2099-01-01")
+    written: list = []
+
+    def watch() -> Watch:
+        w = make_watch({}, {}, [], state, metrics=written.extend)
+        w.zones = lambda metric, start, end: zones.get(metric, {})
+        return w
+
+    alerts, status = watch().run(datetime(2026, 11, 20, 10, tzinfo=UTC))
+    assert alerts == [] and state.warmup_checked  # first run: history only
+    assert status["warmup_upstairs"] == "2h 30m (usual 2h 30m)" and status["warmup_when"] == "Thu 06:00"
+    assert len(written) == 8 and written[0].measurement == "heating"
+    assert written[0].tags == {"zone": "Upstairs"} and written[0].fields["warmup_min"] == 150
+    i, t = morning(8, 260)
+    inside |= i
+    target |= t
+    alerts, status = watch().run(datetime(2026, 11, 21, 10, tzinfo=UTC))
+    assert [a[0] for a in alerts] == ["Slow to warm up: Upstairs"]
+    assert "took 4h 20m to reach 21.5 °C from 20.0 °C after Fri 06:00 (usually 2h 30m)" in alerts[0][1]
+    assert watch().run(datetime(2026, 11, 21, 11, tzinfo=UTC))[0] == []  # told once

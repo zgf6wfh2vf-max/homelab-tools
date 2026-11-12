@@ -852,6 +852,134 @@
     },
     "overrides": []
    }
+  },
+  {
+   "id": 8,
+   "type": "timeseries",
+   "title": "Warm-up time after the heating comes on",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "gridPos": {
+    "h": 9,
+    "w": 24,
+    "x": 0,
+    "y": 45
+   },
+   "timeFrom": "35d",
+   "description": "Minutes each zone took to reach its new target after the target was raised by at least 1 \u00b0C, from usage-watch. A rising trend in cold weather can mean the boiler's flow temperature is too low.",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "max by (zone) (max_over_time(heating_warmup_min[2h])) / 60",
+     "legendFormat": "{{zone}}",
+     "refId": "A",
+     "interval": "30m"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "max(max_over_time(heating_warmup_outside_c[2h]))",
+     "legendFormat": "Outside \u00b0C at start",
+     "refId": "B",
+     "interval": "30m"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "none"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "h",
+     "decimals": 1,
+     "min": 0,
+     "custom": {
+      "drawStyle": "points",
+      "pointSize": 8,
+      "lineWidth": 1,
+      "fillOpacity": 0,
+      "showPoints": "always",
+      "spanNulls": false
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Downstairs"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "blue"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Upstairs"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "orange"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Outside \u00b0C at start"
+      },
+      "properties": [
+       {
+        "id": "unit",
+        "value": "celsius"
+       },
+       {
+        "id": "min",
+        "value": null
+       },
+       {
+        "id": "custom.axisPlacement",
+        "value": "right"
+       },
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "green"
+        }
+       },
+       {
+        "id": "custom.pointSize",
+        "value": 5
+       }
+      ]
+     }
+    ]
+   }
   }
  ],
  "annotations": {

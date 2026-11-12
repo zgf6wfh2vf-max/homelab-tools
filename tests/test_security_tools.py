@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 
 import pytest
 
@@ -33,6 +34,7 @@ def pihole(tmp_path) -> str:
         """
     )
     gravity.commit()
+    gravity.close()
     ftl = sqlite3.connect(tmp_path / "pihole-FTL.db")
     ftl.executescript(
         """
@@ -49,6 +51,7 @@ def pihole(tmp_path) -> str:
         """
     )
     ftl.commit()
+    ftl.close()
     return str(tmp_path)
 
 
@@ -68,6 +71,7 @@ def test_threat_database_finds_only_threat_list_hits(pihole) -> None:
     allowed = list(db.hits(blocked_only=False))
     assert any(h.domain == "phish.test" and h.client_name == "192.168.1.9" for h in allowed)
     assert db.max_query_id() == 5
+    db.close()
 
 
 def test_grouping_dedup_and_realert() -> None:
@@ -100,7 +104,8 @@ def test_alert_text_truncates_long_lists() -> None:
 
 def test_report_includes_allowed_lookups(pihole, monkeypatch) -> None:
     monkeypatch.setattr("time.time", lambda: 2000)
-    lines = report(ThreatDatabase(pihole, "%hagezi%tif%"), days=1)
+    with closing(ThreatDatabase(pihole, "%hagezi%tif%")) as db:
+        lines = report(db, days=1)
     assert lines[-1] == "2 distinct device/domain pairs in the last 1 days"
     assert any("phish.test" in line for line in lines)
 
@@ -161,3 +166,4 @@ def test_follow_handles_append_truncate_and_rotation(tmp_path) -> None:
         f.write("new file\n")
     seen = [next(lines) for _ in range(4)]
     assert "new file\n" in seen
+    lines.close()  # closes the log file

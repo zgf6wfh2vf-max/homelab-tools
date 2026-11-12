@@ -37,6 +37,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -177,7 +178,7 @@ def sha256(path: Path) -> str:
 def sqlite_problem(path: Path) -> str | None:
     """``None`` if ``path`` is a healthy SQLite database, else what is wrong with it."""
     try:
-        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as db:
+        with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as db:
             result = db.execute("PRAGMA quick_check").fetchone()[0]
     except sqlite3.Error as exc:
         return f"database does not open: {exc}"

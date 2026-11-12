@@ -6,6 +6,7 @@ import os
 import shutil
 import sqlite3
 import subprocess
+from contextlib import closing
 from datetime import date
 from pathlib import Path
 
@@ -32,6 +33,7 @@ def stacks(tmp_path: Path) -> Path:
     db.execute("CREATE TABLE t (x)")
     db.executemany("INSERT INTO t VALUES (?)", [(i,) for i in range(100)])
     db.commit()
+    db.close()
     (src / "app" / "data" / "bolt.db").write_bytes(b"\x00\x00\x00\x00BoltDB-ish binary")
     return src
 
@@ -42,9 +44,9 @@ def test_snapshot_contents(tmp_path: Path, stacks: Path) -> None:
     assert result.returncode == 0, result.stderr
     snap = dest / date.today().isoformat()
     assert (snap / "app" / "compose.yaml").read_text() == "services: {}\n"
-    copy = sqlite3.connect(snap / "app" / "data" / "app.db")
-    assert copy.execute("SELECT count(*) FROM t").fetchone() == (100,)
-    assert copy.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    with closing(sqlite3.connect(snap / "app" / "data" / "app.db")) as copy:
+        assert copy.execute("SELECT count(*) FROM t").fetchone() == (100,)
+        assert copy.execute("PRAGMA integrity_check").fetchone() == ("ok",)
     assert not (snap / "app" / "data" / "app.db-wal").exists()
     assert (snap / "app" / "data" / "bolt.db").read_bytes().endswith(b"BoltDB-ish binary")
     assert not list(dest.glob("*.partial"))
@@ -71,7 +73,8 @@ def test_keeps_only_newest_snapshots(tmp_path: Path, stacks: Path) -> None:
 def test_extra_directory(tmp_path: Path, stacks: Path) -> None:
     extra = tmp_path / "appdata"
     extra.mkdir()
-    sqlite3.connect(extra / "x.sqlite").execute("CREATE TABLE y (z)")
+    with closing(sqlite3.connect(extra / "x.sqlite")) as db:
+        db.execute("CREATE TABLE y (z)")
     dest = tmp_path / "backups"
     assert run(stacks, dest, SNAPSHOT_EXTRA=str(extra)).returncode == 0
     assert (dest / date.today().isoformat() / "_extra" / "x.sqlite").exists()

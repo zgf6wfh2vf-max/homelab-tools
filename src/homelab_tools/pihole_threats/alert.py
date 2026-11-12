@@ -29,6 +29,7 @@ import sqlite3
 import sys
 import time
 from collections.abc import Iterator
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -78,6 +79,10 @@ class ThreatDatabase:
             )
         ]
         self._cache: dict[str, bool] = {}
+
+    def close(self) -> None:
+        """Close the database connection."""
+        self.db.close()
 
     def is_threat(self, domain: str) -> bool:
         """Whether ``domain`` (or a parent domain) is on the threat list; cached per run."""
@@ -188,11 +193,17 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    db = ThreatDatabase(env_str("PIHOLE_DIR", "/etc/pihole"), env_str("THREAT_LIST_MATCH", "%hagezi%tif%"))
+    pihole_dir = env_str("PIHOLE_DIR", "/etc/pihole")
+    with closing(ThreatDatabase(pihole_dir, env_str("THREAT_LIST_MATCH", "%hagezi%tif%"))) as db:
+        check(db, args.report)
+
+
+def check(db: ThreatDatabase, report_days: int | None) -> None:
+    """Alert on new threat-list lookups (or print a report of the last ``report_days``)."""
     if not db.list_ids:
         sys.exit("threat list not found among the enabled Pi-hole adlists (check THREAT_LIST_MATCH)")
-    if args.report:
-        print("\n".join(report(db, args.report)))
+    if report_days:
+        print("\n".join(report(db, report_days)))
         return
 
     state_file = Path(env_str("THREAT_STATE_FILE", "/var/lib/pihole-threat-alert/state.json"))

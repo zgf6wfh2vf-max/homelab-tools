@@ -129,31 +129,35 @@ def follow(path: str, sleep: Callable[[float], None] = time.sleep) -> Iterator[s
     """
     handle: TextIO | None = None
     inode = -1
-    while True:
-        if handle is None:
-            try:
-                handle = open(path)  # noqa: SIM115 - kept open across iterations on purpose
-                inode = os.fstat(handle.fileno()).st_ino
-                handle.seek(0, os.SEEK_END)
-            except OSError:
-                yield None
-                sleep(5)
+    try:
+        while True:
+            if handle is None:
+                try:
+                    handle = open(path)  # noqa: SIM115 - kept open across iterations on purpose
+                    inode = os.fstat(handle.fileno()).st_ino
+                    handle.seek(0, os.SEEK_END)
+                except OSError:
+                    yield None
+                    sleep(5)
+                    continue
+            line = handle.readline()
+            if line:
+                yield line
                 continue
-        line = handle.readline()
-        if line:
-            yield line
-            continue
-        try:
-            stat = Path(path).stat()
-            reopen = stat.st_ino != inode or stat.st_size < handle.tell()
-        except OSError:
-            reopen = True
-        if reopen:
+            try:
+                stat = Path(path).stat()
+                reopen = stat.st_ino != inode or stat.st_size < handle.tell()
+            except OSError:
+                reopen = True
+            if reopen:
+                handle.close()
+                handle = None
+                continue
+            yield None
+            sleep(1)
+    finally:  # the caller stopped iterating (or an error): don't leak the open log file
+        if handle is not None:
             handle.close()
-            handle = None
-            continue
-        yield None
-        sleep(1)
 
 
 def main() -> None:

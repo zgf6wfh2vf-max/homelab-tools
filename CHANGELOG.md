@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.15.1
+
+* `restic-restore-test` and `pihole-threat-alert` close their SQLite connections, and the
+  `opencanary-ntfy` log follower closes its file when stopped (Python 3.13 `ResourceWarning`s).
+* CI: `actions/checkout` and `actions/setup-python` v7 (Node 24; no more `punycode` deprecation
+  warning).
+
 ## 0.15.0
 
 * `usage-watch`: heating warm-up check. Each time a tado zone's target is raised, it measures how

@@ -56,14 +56,17 @@ outside. If this keeps happening as it gets colder, the boiler's flow temperatur
 may be too low, or a radiator valve may be stuck.
 ```
 
-A warm-up is reported when it takes `WARMUP_FACTOR` (1.5×) the zone's usual time (the median of
-its warm-ups over the previous two weeks, once there are at least 5) **and** `WARMUP_MIN_EXTRA_MIN`
-(45) minutes longer, or when the room never reaches the target before the target changes again.
-Each warm-up is checked once. The first run only learns from history.
+A warm-up is reported when its **last degree** (from 1 °C short of the target until the room
+reaches it) takes `WARMUP_FACTOR` (1.5×) the zone's usual (the median of its warm-ups over the
+previous two weeks, once there are at least 5) **and** `WARMUP_MIN_EXTRA_MIN` (45) minutes longer,
+or when the room never reaches the target before the target changes again. Comparing the last
+degree rather than the whole warm-up means a frosty morning that starts 2 °C colder isn't reported
+just for having further to go, and the final approach is where a flow temperature that's too low
+for the weather shows most. Each warm-up is checked once. The first run only learns from history.
 
 Every warm-up of the last 35 days is written to VictoriaMetrics with the zone as a label:
-`heating_warmup_min` (minutes; missing when the target wasn't reached), `heating_warmup_reached`
-(1/0), `heating_warmup_gap_c` (degrees to climb) and `heating_warmup_outside_c`. The
+`heating_warmup_min` (minutes; missing when the target wasn't reached), `heating_warmup_last_min`
+(minutes the last degree took), `heating_warmup_reached` (1/0), `heating_warmup_gap_c` (degrees to climb) and `heating_warmup_outside_c`. The
 [Heating dashboard](dashboards.md) charts the minutes against the outside temperature.
 
 ## Electricity always-on load
@@ -101,6 +104,7 @@ Usage: `usage-watch` (meant for a daily timer after `octopus-collector` has run)
 **Status** (`usage.json`): `gas_day`, `gas_used`, `gas_expected`, `gas_outside` (the newest gas day
 checked), `base_now`, `base_usual` (baseload in W; until there are 9 complete days of
 history, "learning" and the date it starts, e.g. "from Wed 4 Nov"), `warmup_when` (when the latest
-warm-up started, e.g. "Thu 06:00"), per zone `warmup_<zone>` (its latest warm-up and usual, e.g.
-"2h 56m (usual 2h 44m)", "not reached (usual 2h 44m)" or "1h 50m (usual learning)"; `<zone>` is the
+warm-up started, e.g. "Thu 06:00"), per zone `warmup_<zone>` (its latest warm-up, its last
+degree and the usual last degree, e.g. "2h 56m · last °C 1h 10m (usual 1h 05m)", "not reached (last °C usual 1h 05m)" or
+"1h 50m · last °C 1h 05m (usual learning)"; `<zone>` is the
 zone name's first word in lower case, as in [tado](tado.md)) and `checked`.

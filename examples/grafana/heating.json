@@ -444,7 +444,7 @@
       "uid": "vm"
      },
      "expr": "avg_over_time(tado_weather_outside_c[1d] offset -1d)",
-     "legendFormat": "Avg outside \u00b0C",
+     "legendFormat": "Avg outside °C",
      "refId": "C",
      "interval": "1d"
     }
@@ -518,7 +518,7 @@
      {
       "matcher": {
        "id": "byName",
-       "options": "Avg outside \u00b0C"
+       "options": "Avg outside °C"
       },
       "properties": [
        {
@@ -589,7 +589,7 @@
       "uid": "vm"
      },
      "expr": "max_over_time(usage_gas_outside_c[1d])",
-     "legendFormat": "Outside \u00b0C",
+     "legendFormat": "Outside °C",
      "refId": "C",
      "interval": "1d"
     }
@@ -679,7 +679,7 @@
      {
       "matcher": {
        "id": "byName",
-       "options": "Outside \u00b0C"
+       "options": "Outside °C"
       },
       "properties": [
        {
@@ -868,7 +868,7 @@
     "y": 45
    },
    "timeFrom": "35d",
-   "description": "Minutes each zone took to reach its new target after the target was raised by at least 1 \u00b0C, from usage-watch. A rising trend in cold weather can mean the boiler's flow temperature is too low.",
+   "description": "Hours each zone took to reach its new target after the target was raised by at least 1 °C (big points), and how long the last degree of that took (small points) - the part usage-watch compares with the usual. A rising last-degree trend in cold weather can mean the boiler's flow temperature is too low.",
    "targets": [
     {
      "datasource": {
@@ -885,8 +885,18 @@
       "type": "prometheus",
       "uid": "vm"
      },
+     "expr": "max by (zone) (max_over_time(heating_warmup_last_min[2h])) / 60",
+     "legendFormat": "{{zone}} last °C",
+     "refId": "C",
+     "interval": "30m"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
      "expr": "max(max_over_time(heating_warmup_outside_c[2h]))",
-     "legendFormat": "Outside \u00b0C at start",
+     "legendFormat": "Outside °C at start",
      "refId": "B",
      "interval": "30m"
     }
@@ -950,7 +960,7 @@
      {
       "matcher": {
        "id": "byName",
-       "options": "Outside \u00b0C at start"
+       "options": "Outside °C at start"
       },
       "properties": [
        {
@@ -970,6 +980,44 @@
         "value": {
          "mode": "fixed",
          "fixedColor": "green"
+        }
+       },
+       {
+        "id": "custom.pointSize",
+        "value": 5
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Downstairs last °C"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "light-blue"
+        }
+       },
+       {
+        "id": "custom.pointSize",
+        "value": 5
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Upstairs last °C"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "light-orange"
         }
        },
        {

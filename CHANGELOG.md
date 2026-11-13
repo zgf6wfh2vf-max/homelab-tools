@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.15.3
+
+* `usage-watch`: warm-ups are compared by their last degree (from 1 °C short of the target until
+  the room reaches it) instead of the whole warm-up, so a colder start on a frosty morning isn't
+  reported as slow. New metric `heating_warmup_last_min`; the `warmup_<zone>` status shows both,
+  e.g. "2h 56m · last °C 1h 10m (usual 1h 05m)".
+
 ## 0.15.2
 
 * `octopus-setup` reads the API key from `OCTOPUS_API_KEY_FILE`, like the other Octopus tools,

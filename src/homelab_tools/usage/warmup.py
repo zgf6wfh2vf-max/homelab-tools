@@ -5,6 +5,11 @@ block starting) while the room is at least ``min_gap`` °C below the new target.
 room gets within ``tolerance`` of the target, or - if it never does - when the target changes
 again. Warm-ups still in progress when the data ends are left for the next run.
 
+Warm-ups are compared by their *last degree*: the time from the room getting within 1 °C of
+reaching the target to reaching it. That doesn't depend on how cold the room started (a frosty
+morning just adds a fast first stretch), and the final approach is where a flow temperature that's
+too low for the weather shows most.
+
 Slow warm-ups are a useful early sign that the boiler's flow temperature (or weather-compensation
 curve) is too low for the weather, or that a radiator valve is stuck: the gas bill may look fine
 while rooms stay cold for longer.
@@ -36,6 +41,8 @@ class Warmup:
         reached: When the room got to the target; ``None`` if the target changed first.
         best: Warmest the room got during the warm-up (°C).
         outside: Outside temperature at the start (°C), if known.
+        last_from: When the room got within 1 °C of reaching the target (the start of its last
+            degree); ``None`` if it never did.
     """
 
     zone: str
@@ -45,11 +52,24 @@ class Warmup:
     reached: datetime | None
     best: float
     outside: float | None
+    last_from: datetime | None = None
+
+    @property
+    def gap(self) -> float:
+        """Degrees the room had to climb (°C)."""
+        return self.target - self.start_temp
 
     @property
     def minutes(self) -> float | None:
         """Minutes to reach the target, or ``None`` if it wasn't reached."""
         return None if self.reached is None else (self.reached - self.start).total_seconds() / 60
+
+    @property
+    def last_minutes(self) -> float | None:
+        """Minutes the last degree took, or ``None`` if the target wasn't reached."""
+        if self.reached is None:
+            return None
+        return (self.reached - (self.last_from or self.start)).total_seconds() / 60
 
 
 def vm_zone_series(vm_url: str) -> ZoneSeries:
@@ -106,31 +126,32 @@ def find_warmups(
         ends = next((when for when, t in targets[i + 1 :] if abs(t - goal) > 0.05), None)
         during = [(when, t) for when, t in temps if when >= start and (ends is None or when < ends)]
         reached = next((when for when, t in during if t >= goal - tolerance), None)
+        last_from = next((when for when, t in during if t >= goal - tolerance - 1.0), None)
         if reached is None and ends is None:
             continue  # still warming up
         best = max([t for when, t in during if reached is None or when <= reached] or [start_temp])
-        found.append(Warmup(zone, start, goal, start_temp, reached, best, _before(weather, start)))
+        found.append(Warmup(zone, start, goal, start_temp, reached, best, _before(weather, start), last_from))
     return found
 
 
 def usual_minutes(history: Sequence[Warmup], before: Warmup, days: int = 14, need: int = 5) -> float | None:
-    """Median minutes of the zone's completed warm-ups in the ``days`` before ``before``."""
+    """Median last-degree minutes of the zone's completed warm-ups in the ``days`` before ``before``."""
     since = before.start - timedelta(days=days)
     times = [
-        w.minutes
+        w.last_minutes
         for w in history
-        if w.zone == before.zone and since <= w.start < before.start and w.minutes is not None
+        if w.zone == before.zone and since <= w.start < before.start and w.last_minutes is not None
     ]
     return statistics.median(times) if len(times) >= need else None
 
 
 def is_slow(warmup: Warmup, usual: float | None, factor: float, min_extra: float) -> bool:
-    """Whether a warm-up took ``factor`` times its usual time and ``min_extra`` minutes more, or failed."""
+    """Whether the last degree took ``factor`` times its usual and ``min_extra`` minutes more, or failed."""
     if usual is None:
         return False
-    if warmup.minutes is None:
+    if warmup.last_minutes is None:
         return True
-    return warmup.minutes > factor * usual and warmup.minutes - usual >= min_extra
+    return warmup.last_minutes > factor * usual and warmup.last_minutes - usual >= min_extra
 
 
 def duration(minutes: float) -> str:

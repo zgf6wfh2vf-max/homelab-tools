@@ -223,7 +223,10 @@ def test_watch_warmups_learn_quietly_first_then_alert_on_a_slow_morning() -> Non
 
     alerts, status = watch().run(datetime(2026, 11, 20, 10, tzinfo=UTC))
     assert alerts == [] and state.warmup_checked  # first run: history only
-    assert status["warmup_upstairs"] == "2h 30m (usual 2h 30m)" and status["warmup_when"] == "Thu 06:00"
+    assert (
+        status["warmup_upstairs"] == "2h 30m · last °C 1h 50m (usual 1h 50m)"
+        and status["warmup_when"] == "Thu 06:00"
+    )
     assert len(written) == 8 and written[0].measurement == "heating"
     assert written[0].tags == {"zone": "Upstairs"} and written[0].fields["warmup_min"] == 150
     i, t = morning(8, 260)
@@ -231,5 +234,8 @@ def test_watch_warmups_learn_quietly_first_then_alert_on_a_slow_morning() -> Non
     target |= t
     alerts, status = watch().run(datetime(2026, 11, 21, 10, tzinfo=UTC))
     assert [a[0] for a in alerts] == ["Slow to warm up: Upstairs"]
-    assert "took 4h 20m to reach 21.5 °C from 20.0 °C after Fri 06:00 (usually 2h 30m)" in alerts[0][1]
+    assert (
+        "took 4h 20m to reach 21.5 °C from 20.0 °C after Fri 06:00. "
+        "The last degree took 3h 10m (usually 1h 50m)." in alerts[0][1]
+    )
     assert watch().run(datetime(2026, 11, 21, 11, tzinfo=UTC))[0] == []  # told once

@@ -21,10 +21,10 @@ dehumidifier, a failing appliance. One alert, then a "back to normal" message wh
 
 **Heating warm-up.** Each time a tado zone's target is raised (a schedule block starting), the
 time the room takes to reach it is measured (see :mod:`homelab_tools.usage.warmup`) and written to
-VictoriaMetrics (``heating_warmup_min``). A warm-up that takes ``WARMUP_FACTOR`` times the zone's
-usual (the median of the previous two weeks) and ``WARMUP_MIN_EXTRA_MIN`` minutes longer, or never
-reaches the target, is reported: an early sign that the boiler's flow temperature is too low for
-the weather.
+VictoriaMetrics (``heating_warmup_min``). A warm-up whose last degree (from 1 °C short of the
+target to reaching it) takes ``WARMUP_FACTOR`` times the zone's usual (the median of the previous
+two weeks) and ``WARMUP_MIN_EXTRA_MIN`` minutes longer, or that never reaches the target, is
+reported: an early sign that the boiler's flow temperature is too low for the weather.
 
 Settings (environment): ``VM_URL`` (required), ``WEATHER_LAT`` / ``WEATHER_LON`` (required for the
 gas check), ``NTFY_URL``, ``STATUS_DIR`` and the thresholds in ``docs/usage-watch.md``.
@@ -199,8 +199,9 @@ def warmup_sample(w: Warmup) -> Sample:
     """A warm-up as a metric sample at its start time (``heating_warmup_min{zone=...}`` etc.)."""
     fields = {
         "warmup_min": None if w.minutes is None else round(w.minutes, 1),
+        "warmup_last_min": None if w.last_minutes is None else round(w.last_minutes, 1),
         "warmup_reached": w.minutes is not None,
-        "warmup_gap_c": round(w.target - w.start_temp, 2),
+        "warmup_gap_c": round(w.gap, 2),
         "warmup_outside_c": w.outside,
     }
     return Sample("heating", fields, {"zone": w.zone}, w.start)
@@ -338,12 +339,13 @@ def warmup_alert(w: Warmup, usual: float) -> Alert:
         what = (
             f"{w.zone} didn't reach {w.target:.1f} °C after the heating came on at {start:%a %H:%M}: "
             f"it got to {w.best:.1f} °C from {w.start_temp:.1f} °C{outside}. It usually takes "
-            f"{duration(usual)}."
+            f"{duration(usual)} for the last degree."
         )
     else:
         what = (
             f"{w.zone} took {duration(w.minutes)} to reach {w.target:.1f} °C from {w.start_temp:.1f} °C "
-            f"after {start:%a %H:%M} (usually {duration(usual)}){outside}."
+            f"after {start:%a %H:%M}{outside}. The last degree took {duration(w.last_minutes or 0)} "
+            f"(usually {duration(usual)})."
         )
     return (
         f"Slow to warm up: {w.zone}",
@@ -470,8 +472,12 @@ class Watch:
         status["warmup_when"] = f"{max(w.start for w in latest.values()).astimezone():%a %H:%M}"
         for zone, w in latest.items():
             usual = usual_minutes(warmups, w)
-            took = "not reached" if w.minutes is None else duration(w.minutes)
-            status[f"warmup_{zone_key(zone)}"] = f"{took} (usual {duration(usual) if usual else 'learning'})"
+            usual_text = duration(usual) if usual else "learning"
+            if w.minutes is None or w.last_minutes is None:
+                text = f"not reached (last °C usual {usual_text})"
+            else:
+                text = f"{duration(w.minutes)} · last °C {duration(w.last_minutes)} (usual {usual_text})"
+            status[f"warmup_{zone_key(zone)}"] = text
         new = [w for w in warmups if w.start.isoformat() > self.state.warmup_checked]
         first_run = not self.state.warmup_checked
         self.state.warmup_checked = warmups[-1].start.isoformat()
@@ -481,8 +487,10 @@ class Watch:
         for w in new:
             typical = usual_minutes(warmups, w)
             log.info(
-                "warm-up %s %s: %s (usual %s)", w.zone, w.start.astimezone().strftime("%a %H:%M"),
+                "warm-up %s %s: %s, last degree %s (usual %s)",
+                w.zone, w.start.astimezone().strftime("%a %H:%M"),
                 duration(w.minutes) if w.minutes is not None else "not reached",
+                duration(w.last_minutes) if w.last_minutes is not None else "-",
                 duration(typical) if typical is not None else "-",
             )  # fmt: skip
             if typical is not None and is_slow(w, typical, self.warmup_factor, self.warmup_min_extra):

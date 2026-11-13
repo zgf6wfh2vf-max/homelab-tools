@@ -56,17 +56,32 @@ def test_find_warmups_ignores_small_gaps_and_small_steps() -> None:
 def test_usual_and_slow() -> None:
     history = []
     for day in range(7):
-        inside, target = morning(day, 150)
+        inside, target = morning(day, 150)  # last degree: 20.4 -> 21.4 °C, 110 of the 150 min
         history += find_warmups("Upstairs", inside, target)
-    inside, target = morning(7, 240)
+    assert history[0].last_minutes == 110
+    inside, target = morning(7, 240)  # last degree 176 min
     [late] = find_warmups("Upstairs", inside, target)
     usual = usual_minutes(history + [late], late)
-    assert usual == 150
-    assert is_slow(late, usual, 1.5, 45)  # 240 > 225 and 90 more
+    assert usual == 110
+    assert is_slow(late, usual, 1.5, 45)  # 176 > 165 and 66 more
     assert not is_slow(late, usual, 1.7, 45)
     assert usual_minutes(history[:3] + [late], late) is None  # not enough history
     failed = Warmup("Upstairs", late.start, 21.5, 20.0, None, 20.6, None)
+    assert failed.last_minutes is None
     assert is_slow(failed, usual, 1.5, 45) and not is_slow(failed, None, 1.5, 45)
+
+
+def test_a_colder_start_with_a_normal_last_degree_is_not_slow() -> None:
+    history = []
+    for day in range(7):
+        inside, target = morning(day, 150)
+        history += find_warmups("Upstairs", inside, target)
+    # frosty: 3.5 °C to climb, so 350 min in all - but the last degree takes the usual 110 min
+    inside, target = morning(7, 350, start_temp=18.0)
+    [cold] = find_warmups("Upstairs", inside, target)
+    assert cold.gap == 3.5 and cold.minutes == 350
+    assert cold.last_minutes == 110
+    assert not is_slow(cold, usual_minutes(history, cold), 1.5, 45)
 
 
 def test_duration() -> None:

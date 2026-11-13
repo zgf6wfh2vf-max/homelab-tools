@@ -2,7 +2,10 @@
 
 Pi-hole blocks malware and phishing domains if they are on your blocklists, but it does not tell
 you. A device **asking** for such a domain is a strong sign it is compromised or that someone just
-clicked a bad link. This tool sends a high-priority alert naming the device and domains.
+clicked a bad link. This tool sends a high-priority alert naming the device and domains, and says
+whether Pi-hole blocked the lookup. A lookup it **allowed** - the domain is on your allowlist, or
+was answered before the list caught up - is sent at urgent priority as "Threat DNS lookup NOT
+blocked", because the device may have reached the site.
 
 ## Setup
 
@@ -28,8 +31,11 @@ clicked a bad link. This tool sends a high-priority alert naming the device and 
 
 Adblock rules like `||evil.example^` cover the domain and all its subdomains, so a lookup of
 `cdn.evil.example` is checked against `||cdn.evil.example^`, `||evil.example^` and the bare name.
-Only queries Pi-hole marked as blocked by gravity (status 1, or 9 for a blocked CNAME) alert; the
-`--report` mode also lists *allowed* lookups (e.g. from before the list was added).
+Every lookup of a listed domain alerts. It counts as blocked when Pi-hole's query status says so
+(gravity, regex or denylist, also via a CNAME; blocked upstream; or a special domain), and as
+allowed otherwise (forwarded, answered from cache, or still in progress). Blocked and allowed
+lookups of the same domain are de-duplicated separately, so an allowed one always alerts. The
+`--report` mode lists past lookups with how many were allowed.
 
 The device name is the most recent name Pi-hole recorded for the IP, since DHCP addresses change
 hands over time.

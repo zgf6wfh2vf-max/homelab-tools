@@ -12,6 +12,7 @@ from homelab_tools.pihole_threats.alert import (
     Hit,
     ThreatDatabase,
     alert_text,
+    alert_title,
     candidate_keys,
     group_new_hits,
     report,
@@ -63,13 +64,13 @@ def test_threat_database_finds_only_threat_list_hits(pihole) -> None:
     db = ThreatDatabase(pihole, "%hagezi%tif%")
     assert db.list_ids == [3]
     hits = list(db.hits())
-    assert [(h.query_id, h.domain, h.client_name) for h in hits] == [
-        (1, "cdn.evil.example", "laptop"),  # most recent name for the IP
-        (4, "cdn.evil.example", "laptop"),
+    assert [(h.query_id, h.domain, h.client_name, h.blocked) for h in hits] == [
+        (1, "cdn.evil.example", "laptop", True),  # most recent name for the IP
+        (3, "phish.test", "192.168.1.9", False),  # allowed; no name recorded
+        (4, "cdn.evil.example", "laptop", True),
     ]
-    assert [h.query_id for h in db.hits(after_id=1)] == [4]
-    allowed = list(db.hits(blocked_only=False))
-    assert any(h.domain == "phish.test" and h.client_name == "192.168.1.9" for h in allowed)
+    assert [h.query_id for h in db.hits(after_id=1)] == [3, 4]
+    assert [h.query_id for h in db.hits(blocked_only=True)] == [1, 4]
     assert db.max_query_id() == 5
     db.close()
 
@@ -82,12 +83,32 @@ def test_grouping_dedup_and_realert() -> None:
         Hit(3, 0, "a.bad", "1.1.1.1", "pc"),
     ]
     assert group_new_hits(hits, state, now=100, realert_seconds=3600) == {
-        ("pc", "1.1.1.1"): ["a.bad", "b.bad"]
+        ("pc", "1.1.1.1"): {"a.bad": True, "b.bad": True}
     }
     assert group_new_hits(hits, state, now=200, realert_seconds=3600) == {}
     assert group_new_hits(hits[:1], state, now=100 + 3601, realert_seconds=3600) == {
-        ("pc", "1.1.1.1"): ["a.bad"]
+        ("pc", "1.1.1.1"): {"a.bad": True}
     }
+
+
+def test_an_allowed_lookup_alerts_even_after_a_blocked_one() -> None:
+    state = AlertState(0, {})
+    group_new_hits([Hit(1, 0, "a.bad", "1.1.1.1", "pc")], state, now=100, realert_seconds=3600)
+    allowed = [Hit(2, 0, "a.bad", "1.1.1.1", "pc", blocked=False), Hit(3, 0, "b.bad", "1.1.1.1", "pc")]
+    assert group_new_hits(allowed, state, now=200, realert_seconds=3600) == {
+        ("pc", "1.1.1.1"): {"a.bad": False, "b.bad": True}
+    }
+
+
+def test_alert_title_and_text_say_whether_pihole_blocked_it() -> None:
+    assert alert_title("pc", {"a.bad": True}) == ("Threat DNS lookup: pc", "high")
+    assert alert_title("pc", {"a.bad": True, "b.bad": False}) == (
+        "Threat DNS lookup NOT blocked: pc",
+        "urgent",
+    )
+    assert "Pi-hole blocked it" in alert_text("pc", "1.1.1.1", {"a.bad": True})
+    text = alert_text("pc", "1.1.1.1", {"a.bad": True, "b.bad": False})
+    assert "did NOT block: b.bad (blocked: a.bad)" in text
 
 
 def test_alert_state_round_trip(tmp_path) -> None:
@@ -98,7 +119,7 @@ def test_alert_state_round_trip(tmp_path) -> None:
 
 
 def test_alert_text_truncates_long_lists() -> None:
-    text = alert_text("pc", "1.1.1.1", [f"d{i}" for i in range(7)])
+    text = alert_text("pc", "1.1.1.1", {f"d{i}": True for i in range(7)})
     assert "d4" in text and "d5" not in text and "(+2 more)" in text
 
 
@@ -107,7 +128,8 @@ def test_report_includes_allowed_lookups(pihole, monkeypatch) -> None:
     with closing(ThreatDatabase(pihole, "%hagezi%tif%")) as db:
         lines = report(db, days=1)
     assert lines[-1] == "2 distinct device/domain pairs in the last 1 days"
-    assert any("phish.test" in line for line in lines)
+    assert any("phish.test" in line and "1 allowed" in line for line in lines)
+    assert any("cdn.evil.example" in line and "blocked" in line for line in lines)
 
 
 # --- OpenCanary relay --------------------------------------------------------------------------

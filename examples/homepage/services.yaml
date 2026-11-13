@@ -49,6 +49,7 @@
             - { field: downstairs_temp, label: Now }
             - { field: downstairs_target, label: Target }
             - { field: downstairs_heat, label: Heating }
+            - { field: damp, label: Damp }
     - 3D printer:
         icon: mdi-printer-3d-nozzle
         description: FlashForge AD5X · off when not in use

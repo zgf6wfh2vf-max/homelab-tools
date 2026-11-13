@@ -2,6 +2,10 @@
 
 Read-only: only GET requests are made, so it cannot change the heating.
 
+Also warns when a room stays damp: humidity at ``DAMP_HUMIDITY_PCT`` or more for ``DAMP_HOURS``
+(condensation and mould risk), with a "back to normal" message once it drops below
+``DAMP_CLEAR_PCT``.
+
 tado limits API calls per day: 100 for accounts without an Auto-Assist subscription, 20,000 with
 one. Each round costs two calls (zone states + weather), plus one every ``TADO_DEVICE_EVERY`` rounds
 for device health. With the defaults (every 120 s, devices every 15th round) that is about 1,500
@@ -13,6 +17,9 @@ Settings (environment):
 ``TADO_STATE_FILE``     Which problems were already alerted (default /var/lib/tado-monitor/state.json).
 ``TADO_INTERVAL``       Seconds between rounds, default 120.
 ``TADO_DEVICE_EVERY``   Check device health every N rounds, default 15.
+``DAMP_HUMIDITY_PCT``   Damp warning humidity, default 70; ``0`` turns the warning off.
+``DAMP_HOURS``          Hours at that humidity before warning, default 3.
+``DAMP_CLEAR_PCT``      Humidity below which it's back to normal, default 65.
 
 Outputs: ``tado_*{zone=...}`` and ``tado_weather_*`` metrics, ``$STATUS_DIR/tado.json``, ntfy alerts.
 """
@@ -28,13 +35,16 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from homelab_tools.common.config import Outputs, env_int, env_str
+from homelab_tools.common.config import Outputs, env_float, env_int, env_str
 from homelab_tools.common.metrics import Sample, VictoriaMetrics
 from homelab_tools.common.notify import Notifier
 from homelab_tools.common.status import write_status
 from homelab_tools.tado.auth import DEFAULT_TOKEN_FILE, AccessToken, TokenStore
 from homelab_tools.tado.model import (
+    DampZone,
     DeviceProblem,
+    check_damp,
+    damp_status,
     device_problems,
     display,
     new_problems,
@@ -74,19 +84,36 @@ class TadoMonitor:
         status_dir: str,
         state_file: Path,
         device_every: int = 15,
+        damp: tuple[float, float, float] = (70.0, 3.0, 65.0),
+        clock: Callable[[], float] = time.time,
     ) -> None:
-        """Find the home and load which problems were already alerted."""
+        """Find the home and load which problems were already alerted.
+
+        ``damp`` is ``(humidity %, hours, clear %)`` for the damp warning; a humidity of 0 turns it off.
+        """
         self.client, self.notifier, self.metrics = client, notifier, metrics
         self.status_dir, self.state_file, self.device_every = status_dir, state_file, device_every
+        self.damp_limits, self.clock = damp, clock
         self.home = client.get("/me")["homes"][0]["id"]
         self.zone_names: dict[str, str] = {}
         self.devices = 0
         self.problems: list[DeviceProblem] = []
         try:
-            self.alerted: set[str] = set(json.loads(state_file.read_text()).get("alerted", []))
+            saved = json.loads(state_file.read_text())
         except (OSError, ValueError):
-            self.alerted = set()
+            saved = {}
+        self.alerted: set[str] = set(saved.get("alerted", []))
+        self.damp: dict[str, DampZone] = {
+            zone: DampZone(d.get("since"), bool(d.get("alerted")))
+            for zone, d in saved.get("damp", {}).items()
+        }
         self.rounds = 0
+
+    def save_state(self) -> None:
+        """Write which device problems and damp spells were alerted."""
+        damp = {zone: {"since": d.since, "alerted": d.alerted} for zone, d in self.damp.items() if d.since}
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
+        self.state_file.write_text(json.dumps({"alerted": sorted(self.alerted), "damp": damp}))
 
     def check_devices(self) -> None:
         """Refresh zone names and device health; alert once per new problem."""
@@ -97,8 +124,7 @@ class TadoMonitor:
         fresh, self.alerted = new_problems(self.problems, self.alerted)
         for p in fresh:
             self.notifier.send(p.title, p.message, tags="thermometer,warning")
-        self.state_file.parent.mkdir(parents=True, exist_ok=True)
-        self.state_file.write_text(json.dumps({"alerted": sorted(self.alerted)}))
+        self.save_state()
 
     def poll_once(self) -> None:
         """One round: device health (every Nth round), zone states and weather."""
@@ -114,11 +140,17 @@ class TadoMonitor:
             [Sample("tado", zone_metrics(z), {"zone": z.name}) for z in zones]
             + [Sample("tado_weather", {"outside_c": outside, "solar_pct": solar})]
         )
-        write_status(
-            self.status_dir,
-            "tado",
-            display(zones, outside, weather["weatherState"]["value"], self.devices, self.problems),
-        )
+        status = display(zones, outside, weather["weatherState"]["value"], self.devices, self.problems)
+        high, hours, clear = self.damp_limits
+        if high > 0:
+            now = self.clock()
+            before = {zone: (d.since, d.alerted) for zone, d in self.damp.items()}
+            for title, message in check_damp(zones, self.damp, now, high, hours, clear):
+                self.notifier.send(title, message, tags="droplet")
+            if {zone: (d.since, d.alerted) for zone, d in self.damp.items()} != before:
+                self.save_state()
+            status["damp"] = damp_status(zones, self.damp, now)
+        write_status(self.status_dir, "tado", status)
 
 
 def main() -> None:
@@ -133,6 +165,11 @@ def main() -> None:
         outputs.status_dir,
         Path(env_str("TADO_STATE_FILE", "/var/lib/tado-monitor/state.json")),
         env_int("TADO_DEVICE_EVERY", 15),
+        (
+            env_float("DAMP_HUMIDITY_PCT", 70.0),
+            env_float("DAMP_HOURS", 3.0),
+            env_float("DAMP_CLEAR_PCT", 65.0),
+        ),
     )
     interval = env_int("TADO_INTERVAL", 120)
     log.info("watching tado home %s every %ss", monitor.home, interval)

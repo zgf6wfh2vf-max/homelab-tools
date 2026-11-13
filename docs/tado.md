@@ -2,7 +2,7 @@
 
 Reads **tado°** heating - every zone's temperature, target, humidity, heating demand and open-window
 state, plus tado's outside weather - and alerts when a thermostat or radiator valve has a **low
-battery** or goes **offline**. Read-only (GET requests only).
+battery** or goes **offline**, or when a room stays **damp**. Read-only (GET requests only).
 
 ## Login (once)
 
@@ -37,18 +37,30 @@ On HTTP 429 (rate limited) the monitor pauses for 30 minutes.
 | `TADO_STATE_FILE` | `/var/lib/tado-monitor/state.json` | Problems already alerted |
 | `TADO_INTERVAL` | 120 | Seconds between rounds |
 | `TADO_DEVICE_EVERY` | 15 | Device-health check every N rounds |
+| `DAMP_HUMIDITY_PCT` | 70 | Damp warning humidity (`0` turns it off) |
+| `DAMP_HOURS` | 3 | Hours at that humidity before warning |
+| `DAMP_CLEAR_PCT` | 65 | Humidity below which it's back to normal |
 
 ## Outputs
 
 **Alerts:** "tado radiator valve battery low", "tado room thermostat offline", ... once per device and
 problem; they re-arm when the problem clears (e.g. after new batteries).
 
+"Damp: Upstairs humidity 72%" when a zone has stayed at `DAMP_HUMIDITY_PCT` or more for
+`DAMP_HOURS` - drying washing, showers, cooking, or a cold, unaired room. It gives the room
+temperature and dew point (windows and outside walls colder than the dew point get wet, which is how
+mould starts) and what to do. A "back to normal" message follows once humidity drops below
+`DAMP_CLEAR_PCT`; the gap between the two stops it flapping around one value. When the damp spell
+started is saved, so a restart doesn't reset the clock. Room humidity of 40-60% is comfortable;
+sustained 70%+ in cold weather is when condensation and mould become likely.
+
 **Metrics:** `tado_inside_c`, `tado_target_c`, `tado_humidity_pct`, `tado_heating_pct`,
 `tado_open_window` - each with a `zone` label - and `tado_weather_outside_c`, `tado_weather_solar_pct`.
 
 **Status** (`tado.json`): per zone `<zone>_temp`, `<zone>_target`, `<zone>_hum`, `<zone>_heat`,
 `<zone>_mode`, where `<zone>` is the zone name's first word in lower case (`Living Room` → `living`);
-plus `outside`, `weather`, `devices`, `batteries`, `offline`.
+plus `outside`, `weather`, `devices`, `batteries`, `offline`, and `damp` ("OK", or the zones at or
+over the damp limit and for how long, e.g. "Upstairs 72% for 3h 10m").
 
 The example `heating` Grafana dashboard puts daily gas use (from `octopus-collector`) next to
 average heating demand and outside temperature.

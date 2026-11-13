@@ -5,6 +5,8 @@ Field names follow tado's v2 API (``/homes/{id}/zoneStates``, ``/zones``, ``/wea
 
 from __future__ import annotations
 
+import math
+import time
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -104,6 +106,92 @@ def new_problems(problems: list[DeviceProblem], alerted: set[str]) -> tuple[list
     current = {p.key for p in problems}
     fresh = [p for p in problems if p.key not in alerted]
     return fresh, current
+
+
+def dew_point(temp_c: float, humidity_pct: float) -> float:
+    """Dew point (°C) from air temperature and relative humidity (Magnus formula)."""
+    g = math.log(max(humidity_pct, 1.0) / 100) + 17.62 * temp_c / (243.12 + temp_c)
+    return 243.12 * g / (17.62 - g)
+
+
+@dataclass
+class DampZone:
+    """Damp tracking for one zone: when humidity went over the limit, and whether that was alerted."""
+
+    since: float | None = None
+    alerted: bool = False
+
+
+def _hours(seconds: float) -> str:
+    """``11400`` -> ``"3h 10m"``."""
+    minutes = round(seconds / 60)
+    return f"{minutes // 60}h {minutes % 60:02d}m" if minutes >= 60 else f"{minutes}m"
+
+
+def _damp_alert(z: ZoneReading, high: float, seconds: float) -> tuple[str, str]:
+    """The damp warning for one zone that has been at ``high`` % or more for ``seconds``."""
+    humidity = z.humidity_pct or 0.0
+    dew = ""
+    if z.inside_c is not None:
+        dew = (
+            f" at {z.inside_c:.1f} °C; dew point {dew_point(z.inside_c, humidity):.1f} °C, "
+            "so windows and outside walls colder than that get wet"
+        )
+    return (
+        f"Damp: {z.name} humidity {humidity:.0f}%",
+        f"{z.name} has been at {high:.0f}% humidity or more for {_hours(seconds)} "
+        f"(now {humidity:.0f}%{dew}). Air the room for 10 minutes, use an extractor fan, or dry "
+        "washing elsewhere: long spells of damp air lead to condensation and mould.",
+    )
+
+
+def check_damp(
+    zones: Iterable[ZoneReading],
+    state: dict[str, DampZone],
+    now: float,
+    high: float = 70.0,
+    hours: float = 3.0,
+    clear: float = 65.0,
+) -> list[tuple[str, str]]:
+    """Damp alerts as ``(title, message)``, updating ``state``.
+
+    A zone alerts once its humidity has stayed at ``high`` % or more for ``hours``, and sends a
+    "back to normal" message when it drops below ``clear`` % (the gap stops it flapping).
+    """
+    alerts = []
+    for z in zones:
+        if z.humidity_pct is None:
+            continue
+        st = state.setdefault(z.name, DampZone())
+        if z.humidity_pct >= high:
+            st.since = now if st.since is None else st.since
+            if not st.alerted and now - st.since >= hours * 3600:
+                st.alerted = True
+                alerts.append(_damp_alert(z, high, now - st.since))
+        elif st.alerted:
+            if z.humidity_pct < clear:
+                above = _hours(now - st.since) if st.since is not None else "a while"
+                alerts.append(
+                    (
+                        f"{z.name} humidity back to {z.humidity_pct:.0f}%",
+                        f"{z.name} is below {clear:.0f}% again, after a damp spell of {above}.",
+                    )
+                )
+                state[z.name] = DampZone()
+        else:
+            st.since = None
+    return alerts
+
+
+def damp_status(zones: Iterable[ZoneReading], state: Mapping[str, DampZone], now: float | None = None) -> str:
+    """``"OK"``, or the damp zones, e.g. ``"Upstairs 72% for 3h 10m"``."""
+    now = time.time() if now is None else now
+    damp = [
+        f"{z.name} {z.humidity_pct:.0f}% for {_hours(now - st.since)}"
+        for z in zones
+        if z.humidity_pct is not None and (st := state.get(z.name)) is not None and st.since is not None
+    ]
+    return ", ".join(damp) or "OK"
 
 
 def zone_key(name: str) -> str:

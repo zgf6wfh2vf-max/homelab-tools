@@ -313,7 +313,7 @@
    "id": 3,
    "type": "timeseries",
    "title": "Humidity",
-   "description": "",
+   "description": "Room humidity from tado. The dashed line is tado-monitor's damp warning (70% for 3 hours): condensation and mould become likely.",
    "transparent": false,
    "datasource": {
     "type": "prometheus",
@@ -364,7 +364,23 @@
       "fillOpacity": 8,
       "showPoints": "never",
       "spanNulls": 600000,
-      "gradientMode": "opacity"
+      "gradientMode": "opacity",
+      "thresholdsStyle": {
+       "mode": "dashed"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "transparent",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 70
+       }
+      ]
      }
     },
     "overrides": [

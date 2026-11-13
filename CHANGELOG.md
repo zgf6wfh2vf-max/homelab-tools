@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.16.0
+
+* `tado-monitor`: damp warning when a room stays at 70% humidity or more for 3 hours, with the
+  room's dew point and what to do, and a "back to normal" message under 65% (`DAMP_HUMIDITY_PCT`,
+  `DAMP_HOURS`, `DAMP_CLEAR_PCT`). New `damp` status field; the heating dashboard's humidity
+  chart marks 70%.
+* `pihole-threat-alert` alerts on *every* lookup of a threat-list domain and says whether Pi-hole
+  blocked it. One it allowed is sent at urgent priority as "Threat DNS lookup NOT blocked".
+  Previously only gravity-blocked lookups alerted, so an allowlisted or not-yet-blocked domain went
+  unnoticed. All of Pi-hole's blocked statuses (regex, denylist, upstream, ...) now count as
+  blocked, and `--report` shows how many lookups were allowed.
+
 ## 0.15.3
 
 * `usage-watch`: warm-ups are compared by their last degree (from 1 °C short of the target until

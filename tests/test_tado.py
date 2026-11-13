@@ -8,7 +8,17 @@ import pytest
 from homelab_tools.common.metrics import VictoriaMetrics
 from homelab_tools.common.notify import Notifier
 from homelab_tools.tado.auth import AccessToken, TokenStore, device_login
-from homelab_tools.tado.model import device_problems, display, new_problems, parse_zone_state, zone_key
+from homelab_tools.tado.model import (
+    DampZone,
+    ZoneReading,
+    check_damp,
+    damp_status,
+    device_problems,
+    display,
+    new_problems,
+    parse_zone_state,
+    zone_key,
+)
 from homelab_tools.tado.monitor import TadoClient, TadoMonitor
 
 ZONE_STATE = {
@@ -101,6 +111,35 @@ def test_display_strings() -> None:
         "1",
     )
     assert zone_key("") == "zone"
+
+
+def room(humidity: float | None, temp: float | None = 18.0) -> list[ZoneReading]:
+    return [ZoneReading("Upstairs", temp, humidity, 21.0, 0.0, False, False)]
+
+
+def test_damp_alerts_after_hours_then_clears_with_a_gap() -> None:
+    state: dict[str, DampZone] = {}
+    assert check_damp(room(72), state, now=0) == []
+    assert check_damp(room(71), state, now=2 * 3600) == []
+    assert damp_status(room(71), state, now=2 * 3600) == "Upstairs 71% for 2h 00m"
+    [(title, message)] = check_damp(room(73), state, now=3 * 3600)
+    assert title == "Damp: Upstairs humidity 73%"
+    assert "70% humidity or more for 3h 00m (now 73% at 18.0 °C; dew point 13.1 °C" in message
+    assert check_damp(room(74), state, now=4 * 3600) == []  # told once
+    assert check_damp(room(67), state, now=5 * 3600) == []  # under 70 but not yet clear
+    [(title, message)] = check_damp(room(63), state, now=6 * 3600)
+    assert title == "Upstairs humidity back to 63%" and "damp spell of 6h 00m" in message
+    assert state["Upstairs"] == DampZone() and damp_status(room(63), state) == "OK"
+
+
+def test_damp_timer_restarts_when_humidity_dips_and_ignores_missing_readings() -> None:
+    state: dict[str, DampZone] = {}
+    check_damp(room(72), state, now=0)
+    check_damp(room(69), state, now=2 * 3600)  # dipped before 3 hours: start again
+    assert check_damp(room(72), state, now=3 * 3600) == []
+    assert check_damp(room(None), state, now=7 * 3600) == []
+    [(_, message)] = check_damp(room(72, temp=None), state, now=6 * 3600)
+    assert "for 3h 00m (now 72%)." in message
 
 
 # --- auth --------------------------------------------------------------------------------------
@@ -224,3 +263,31 @@ def test_monitor_round(tmp_path, http) -> None:
     status = json.loads((tmp_path / "tado.json").read_text())
     assert status["downstairs_heat"] == "37%" and status["devices"] == "3"
     assert json.loads((tmp_path / "state.json").read_text())["alerted"] == ["VA1:battery", "VA2:offline"]
+    assert status["damp"] == "OK"
+
+
+def test_monitor_damp_warning_survives_a_restart(tmp_path, http) -> None:
+    api = FakeTado()
+    damp_state = json.loads(json.dumps(ZONE_STATE))
+    damp_state["sensorDataPoints"]["humidity"]["percentage"] = 75.0
+    api.responses["/homes/1234/zoneStates"] = {"zoneStates": {"10": damp_state}}
+    clock = iter([1000.0, 1000.0 + 3 * 3600])
+
+    def monitor() -> TadoMonitor:
+        return TadoMonitor(
+            TadoClient(lambda: "tok", api),
+            Notifier("https://ntfy/t", http),
+            VictoriaMetrics("http://vm", http),
+            str(tmp_path),
+            tmp_path / "state.json",
+            device_every=100,
+            clock=lambda: next(clock),
+        )
+
+    monitor().poll_once()
+    assert json.loads((tmp_path / "state.json").read_text())["damp"]["Downstairs"]["since"] == 1000.0
+    monitor().poll_once()  # restarted: still remembers when it got damp
+    titles = [r.get_header("Title") for r in http.requests if r.get_header("Title")]
+    assert "Damp: Downstairs humidity 75%" in titles
+    status = json.loads((tmp_path / "tado.json").read_text())
+    assert status["damp"] == "Downstairs 75% for 3h 00m"

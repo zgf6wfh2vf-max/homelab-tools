@@ -21,6 +21,7 @@ failed-unit alert. Client errors such as 429 (rate limit) are not retried.
 | `FORECAST_STATE_FILE` | `/var/lib/solar-forecast/state.json` | Which day's curve has been stored |
 | `FORECAST_CURVE_FILE` | `/var/lib/solar-forecast/curve.json` | The latest full forecast (today and tomorrow, every point), rewritten each run for [`battery-check`](battery-check.md); empty disables it |
 | `FORECAST_SOLAR_API_KEY` | - | Optional paid-plan key |
+| `FORECAST_STALE_HOURS` | 3 | Ride out an outage while the saved forecast is newer than this |
 
 Not sure of your tilt or kWp? Start with a typical pitched roof (35°) and compare the forecast with
 actual generation on a few clear days; adjust kWp if it is consistently high or low.

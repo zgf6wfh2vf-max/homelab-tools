@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.1
+
+* `solar-forecast` rides out a short Forecast.Solar outage: if the request still fails after its
+  retry but the saved forecast is under `FORECAST_STALE_HOURS` (3) old, it logs a warning and
+  keeps that forecast instead of failing the run (and raising a failed-service alert). A longer
+  outage still fails.
+
 ## 0.16.0
 
 * `tado-monitor`: damp warning when a room stays at 70% humidity or more for 3 hours, with the

@@ -22,6 +22,9 @@ Settings (environment):
                              run for other tools such as ``battery-check``
                              (default /var/lib/solar-forecast/curve.json; empty disables it).
 ``FORECAST_SOLAR_API_KEY``   Optional paid-plan key (higher limits, more planes).
+``FORECAST_STALE_HOURS``     If Forecast.Solar can't be reached but the saved forecast
+                             (``FORECAST_CURVE_FILE``) is newer than this, the run logs a warning and
+                             succeeds, so a short outage doesn't raise a failed-service alert; default 3.
 
 Metrics: ``forecast_solar_w`` (expected power, hourly points for today) and ``forecast_solar_day_kwh``
 (expected total, one sample at local noon per day).
@@ -37,11 +40,11 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from homelab_tools.common.config import ConfigError, Outputs, env_str
+from homelab_tools.common.config import ConfigError, Outputs, env_float, env_str
 from homelab_tools.common.metrics import Sample, VictoriaMetrics
 from homelab_tools.common.status import write_status
 
@@ -264,6 +267,29 @@ class ForecastJob:
             log.info("stored the forecast curve for %s", today)
         return forecast
 
+    def run_or_keep(self, stale_hours: float = 3.0, now: datetime | None = None) -> Forecast | None:
+        """:meth:`run`, but ride out a short Forecast.Solar outage.
+
+        If the request fails (after :func:`http_json`'s retry) while the saved forecast is less than
+        ``stale_hours`` old, log a warning and return ``None``: the previous forecast stays in use and
+        the next hourly run will most likely work. Otherwise the error is raised, so a lasting
+        outage still fails the run (and alerts).
+        """
+        try:
+            return self.run()
+        except OSError as exc:
+            now = now or datetime.now().astimezone()
+            try:
+                fetched = load_curve(self.curve_file)[0] if self.curve_file else None
+            except (OSError, ValueError):
+                fetched = None
+            if fetched is None or now - fetched > timedelta(hours=stale_hours):
+                raise
+            log.warning(
+                "Forecast.Solar unavailable (%s); keeping the forecast from %s", exc, f"{fetched:%H:%M}"
+            )
+            return None
+
     def _stored_day(self) -> str | None:
         """The day whose curve is already in VictoriaMetrics, if any."""
         try:
@@ -292,7 +318,9 @@ def main() -> None:
         if (curve := env_str("FORECAST_CURVE_FILE", "/var/lib/solar-forecast/curve.json"))
         else None,
     )
-    forecast = job.run()
+    forecast = job.run_or_keep(env_float("FORECAST_STALE_HOURS", 3.0))
+    if forecast is None:
+        return
     days = ", ".join(f"{d}: {wh / 1000:.1f} kWh" for d, wh in sorted(forecast.day_wh.items()))
     log.info("forecast for %d plane(s): %s", len(planes), days)
 

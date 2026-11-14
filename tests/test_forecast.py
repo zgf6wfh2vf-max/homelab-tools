@@ -202,3 +202,27 @@ def test_http_json_gives_up_after_two_failures_and_never_retries_429(monkeypatch
     with pytest.raises(urllib.error.HTTPError):
         http_json("https://x/estimate", sleep=lambda s: None)
     assert calls == [429]
+
+
+def test_run_or_keep_rides_out_a_short_outage_but_not_a_long_one(tmp_path, http) -> None:
+    curve = tmp_path / "curve.json"
+    replies: list[object] = [response("2026-11-14"), urllib.error.URLError("SSL: UNEXPECTED_EOF")]
+
+    def fetch(url: str) -> dict:
+        reply = replies.pop(0) if replies else urllib.error.URLError("still down")
+        if isinstance(reply, Exception):
+            raise reply
+        return reply  # type: ignore[return-value]
+
+    job = ForecastJob(
+        51.5, -0.12, [Plane(35, 0, 6)], VictoriaMetrics("", http), "", tmp_path / "state.json",
+        fetch=fetch, curve_file=curve,
+    )  # fmt: skip
+    assert job.run_or_keep() is not None
+    fetched = load_curve(curve)[0]
+    assert job.run_or_keep(now=fetched + timedelta(hours=1)) is None  # saved forecast is recent
+    with pytest.raises(urllib.error.URLError):
+        job.run_or_keep(now=fetched + timedelta(hours=4))  # too old: fail and alert
+    job.curve_file = None
+    with pytest.raises(urllib.error.URLError):
+        job.run_or_keep()  # nothing saved to fall back on

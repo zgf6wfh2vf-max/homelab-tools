@@ -212,6 +212,11 @@ def test_heating_line_and_fields() -> None:
     )
 
 
+def test_warmups_cut_short_are_not_counted_as_missed() -> None:
+    w = collect(FakeVM(HEATING | {"heating_warmup_cut_short": 1}), date(2026, 11, 9))
+    assert w.warmups_missed == 0
+
+
 def test_heating_line_about_the_same_and_dry() -> None:
     w = WeekFigures(
         date(2026, 11, 9), gas_model_kwh=301.0, gas_expected_kwh=300.0, gas_model_days=7,

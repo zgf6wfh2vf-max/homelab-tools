@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from homelab_tools.usage.warmup import Warmup, duration, find_warmups, is_slow, usual_minutes
+from homelab_tools.usage.warmup import Warmup, duration, find_warmups, is_cut_short, is_slow, usual_minutes
 
 T0 = datetime(2026, 11, 12, 4, 0, tzinfo=UTC)
 
@@ -86,3 +86,30 @@ def test_a_colder_start_with_a_normal_last_degree_is_not_slow() -> None:
 
 def test_duration() -> None:
     assert duration(45) == "45m" and duration(125) == "2h 05m" and duration(59.6) == "1h 00m"
+
+
+def test_a_target_lowered_early_is_cut_short_not_failed() -> None:
+    history = []
+    for day in range(7):
+        inside, target = morning(day, 150)
+        history += find_warmups("Upstairs", inside, target)
+    assert all(w.lowered is None for w in history)
+    usual_total = usual_minutes(history, history[-1], last=False)
+    assert usual_total == 150
+    # Away mode: the target drops to 18 °C 60 minutes in, before the room got there
+    inside, target = morning(7, None)
+    away = T0 + timedelta(days=7, hours=3)
+    target = {k: (18.0 if away <= k < away + timedelta(hours=8) else v) for k, v in target.items()}
+    [w] = find_warmups("Upstairs", inside, target)
+    assert w.reached is None and w.lowered == away
+    assert is_cut_short(w, usual_total)
+    assert not is_slow(w, 110, 1.5, 45, usual_total)
+    assert is_slow(w, 110, 1.5, 45)  # without the usual total it still looks failed
+    # lowered only after longer than the usual whole warm-up: a real failure
+    inside, target = morning(7, None)
+    late = T0 + timedelta(days=7, hours=6)
+    target = {k: (18.0 if late <= k < late + timedelta(hours=8) else v) for k, v in target.items()}
+    [w] = find_warmups("Upstairs", inside, target)
+    assert w.lowered == late and not is_cut_short(w, usual_total)
+    assert is_slow(w, 110, 1.5, 45, usual_total)
+    assert not is_cut_short(w, None)

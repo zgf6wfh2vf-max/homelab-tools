@@ -6,6 +6,10 @@
   how quickly rooms' last degree warmed up compared with the fortnight before, warm-ups that never
   reached the target, the coldest day, and peak humidity / damp hours. New `weekly.json` fields
   `gas_vs_weather`, `warmup_change`, `coldest` and `damp`.
+* `usage-watch`: a warm-up whose target was lowered before the room got there, sooner than the zone
+  usually takes to warm up (tado's Away mode, or the heating turned down), is *cut short*: no "Slow to
+  warm up" alert, "cut short" in the status, a new `heating_warmup_cut_short` metric, and the weekly
+  report doesn't count it as missed.
 
 ## 0.16.1
 

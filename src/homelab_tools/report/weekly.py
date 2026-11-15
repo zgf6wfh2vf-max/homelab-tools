@@ -225,9 +225,12 @@ def collect_heating(query: Query, w: WeekFigures, days: list[date], window: str,
         f"/ quantile_over_time(0.5, heating_warmup_last_min[14d] offset {window}))",
         at,
     )
-    # heating_warmup_reached is 1/0 per warm-up: the count minus the sum is the ones not reached
+    # heating_warmup_reached is 1/0 per warm-up: the count minus the sum is the ones not reached,
+    # less those cut short (target lowered early, e.g. Away mode)
     reached = f"heating_warmup_reached[{window}]"
-    w.warmups_missed = round(query(f"sum(count_over_time({reached}) - sum_over_time({reached}))", at) or 0)
+    missed = f"sum(count_over_time({reached}) - sum_over_time({reached}))"
+    cut = query(f"sum(sum_over_time(heating_warmup_cut_short[{window}]))", at) or 0
+    w.warmups_missed = max(0, round((query(missed, at) or 0) - cut))
     w.humidity_max = query(f"max(max_over_time(tado_humidity_pct[{window}]))", at)
     if w.humidity_max is not None:
         w.damp_hours = (

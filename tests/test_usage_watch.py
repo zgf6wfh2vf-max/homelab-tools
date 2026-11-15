@@ -239,3 +239,13 @@ def test_watch_warmups_learn_quietly_first_then_alert_on_a_slow_morning() -> Non
         "The last degree took 3h 10m (usually 1h 50m)." in alerts[0][1]
     )
     assert watch().run(datetime(2026, 11, 21, 11, tzinfo=UTC))[0] == []  # told once
+    # Away mode on Saturday: the target drops 60 minutes in - cut short, no alert
+    i, t = morning(9, None)
+    away = datetime(2026, 11, 21, 7, tzinfo=UTC)
+    inside |= i
+    target |= {k: (18.0 if away <= k < away + timedelta(hours=8) else v) for k, v in t.items()}
+    written.clear()
+    alerts, status = watch().run(datetime(2026, 11, 22, 10, tzinfo=UTC))
+    assert alerts == []
+    assert status["warmup_upstairs"].startswith("cut short (target lowered Sat ")
+    assert written[-1].fields["warmup_cut_short"] is True and written[-1].fields["warmup_reached"] is False

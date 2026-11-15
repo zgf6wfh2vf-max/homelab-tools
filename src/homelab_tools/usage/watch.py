@@ -24,7 +24,9 @@ time the room takes to reach it is measured (see :mod:`homelab_tools.usage.warmu
 VictoriaMetrics (``heating_warmup_min``). A warm-up whose last degree (from 1 °C short of the
 target to reaching it) takes ``WARMUP_FACTOR`` times the zone's usual (the median of the previous
 two weeks) and ``WARMUP_MIN_EXTRA_MIN`` minutes longer, or that never reaches the target, is
-reported: an early sign that the boiler's flow temperature is too low for the weather.
+reported: an early sign that the boiler's flow temperature is too low for the weather. A warm-up
+cut short - the target lowered (e.g. tado's Away mode) sooner than the zone usually takes to warm
+up - isn't.
 
 Settings (environment): ``VM_URL`` (required), ``WEATHER_LAT`` / ``WEATHER_LON`` (required for the
 gas check), ``NTFY_URL``, ``STATUS_DIR`` and the thresholds in ``docs/usage-watch.md``.
@@ -57,6 +59,7 @@ from homelab_tools.usage.warmup import (
     ZoneSeries,
     duration,
     find_warmups,
+    is_cut_short,
     is_slow,
     usual_minutes,
     vm_zone_series,
@@ -195,12 +198,13 @@ def gas_samples(
 WARMUP_HISTORY_DAYS = 35
 
 
-def warmup_sample(w: Warmup) -> Sample:
+def warmup_sample(w: Warmup, cut_short: bool = False) -> Sample:
     """A warm-up as a metric sample at its start time (``heating_warmup_min{zone=...}`` etc.)."""
     fields = {
         "warmup_min": None if w.minutes is None else round(w.minutes, 1),
         "warmup_last_min": None if w.last_minutes is None else round(w.last_minutes, 1),
         "warmup_reached": w.minutes is not None,
+        "warmup_cut_short": cut_short,
         "warmup_gap_c": round(w.gap, 2),
         "warmup_outside_c": w.outside,
     }
@@ -466,14 +470,17 @@ class Watch:
         )  # fmt: skip
         if not warmups:
             return []
+        cut = {w for w in warmups if is_cut_short(w, usual_minutes(warmups, w, last=False))}
         if self.metrics:
-            self.metrics([warmup_sample(w) for w in warmups])
+            self.metrics([warmup_sample(w, w in cut) for w in warmups])
         latest: dict[str, Warmup] = {w.zone: w for w in warmups}
         status["warmup_when"] = f"{max(w.start for w in latest.values()).astimezone():%a %H:%M}"
         for zone, w in latest.items():
             usual = usual_minutes(warmups, w)
             usual_text = duration(usual) if usual else "learning"
-            if w.minutes is None or w.last_minutes is None:
+            if w in cut and w.lowered is not None:
+                text = f"cut short (target lowered {w.lowered.astimezone():%a %H:%M})"
+            elif w.minutes is None or w.last_minutes is None:
                 text = f"not reached (last °C usual {usual_text})"
             else:
                 text = f"{duration(w.minutes)} · last °C {duration(w.last_minutes)} (usual {usual_text})"
@@ -489,11 +496,13 @@ class Watch:
             log.info(
                 "warm-up %s %s: %s, last degree %s (usual %s)",
                 w.zone, w.start.astimezone().strftime("%a %H:%M"),
-                duration(w.minutes) if w.minutes is not None else "not reached",
+                "cut short" if w in cut else duration(w.minutes) if w.minutes is not None else "not reached",
                 duration(w.last_minutes) if w.last_minutes is not None else "-",
                 duration(typical) if typical is not None else "-",
             )  # fmt: skip
-            if typical is not None and is_slow(w, typical, self.warmup_factor, self.warmup_min_extra):
+            if w in cut or typical is None:
+                continue
+            if is_slow(w, typical, self.warmup_factor, self.warmup_min_extra):
                 alerts.append(warmup_alert(w, typical))
         return alerts
 

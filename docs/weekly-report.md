@@ -20,7 +20,7 @@ Each line appears only when its data exists:
 | Solar, battery | `solis-monitor` |
 | Car | `podpoint-monitor` |
 | Off-peak, gas, heating | `octopus-collector`, `tado-monitor` |
-| Heating | [`usage-watch`](usage-watch.md) (gas against what the weather predicted, over the days it has modelled; each room's median last-degree warm-up time against its median in the two weeks before, and warm-ups that never reached the target) and [`tado-monitor`](tado.md) (coldest day by average outside temperature, peak humidity and hours at 70% or more, summed over rooms) |
+| Heating | [`usage-watch`](usage-watch.md) (gas against what the weather predicted, over the days it has modelled; each room's median last-degree warm-up time against its median in the two weeks before, and warm-ups that never reached the target, not counting those cut short) and [`tado-monitor`](tado.md) (coldest day by average outside temperature, peak humidity and hours at 70% or more, summed over rooms) |
 | Systems | Any of [`internet-monitor`](internet-monitor.md) (outages, median speed-test result), [`powerline-monitor`](powerline-monitor.md) (slowest and fastest link, as weekly averages), [`solar-health`](solar-health.md) (battery health), and the current [`host-health`](host-health.md) and [restore-test](restic-restore-test.md) results from `STATUS_DIR` |
 
 ## When to run it

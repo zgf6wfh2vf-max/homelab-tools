@@ -5,6 +5,10 @@ block starting) while the room is at least ``min_gap`` °C below the new target.
 room gets within ``tolerance`` of the target, or - if it never does - when the target changes
 again. Warm-ups still in progress when the data ends are left for the next run.
 
+A warm-up whose target was *lowered* before the room got there, sooner than the zone usually takes
+to warm up (tado's Away mode, or someone turning it down), was *cut short*: it says nothing about
+the heating, so it isn't treated as a failure.
+
 Warm-ups are compared by their *last degree*: the time from the room getting within 1 °C of
 reaching the target to reaching it. That doesn't depend on how cold the room started (a frosty
 morning just adds a fast first stretch), and the final approach is where a flow temperature that's
@@ -43,6 +47,7 @@ class Warmup:
         outside: Outside temperature at the start (°C), if known.
         last_from: When the room got within 1 °C of reaching the target (the start of its last
             degree); ``None`` if it never did.
+        lowered: When the target was lowered before the room reached it; ``None`` if it wasn't.
     """
 
     zone: str
@@ -53,6 +58,7 @@ class Warmup:
     best: float
     outside: float | None
     last_from: datetime | None = None
+    lowered: datetime | None = None
 
     @property
     def gap(self) -> float:
@@ -129,25 +135,46 @@ def find_warmups(
         last_from = next((when for when, t in during if t >= goal - tolerance - 1.0), None)
         if reached is None and ends is None:
             continue  # still warming up
+        lowered = ends if reached is None and ends is not None and target[ends] < goal else None
         best = max([t for when, t in during if reached is None or when <= reached] or [start_temp])
-        found.append(Warmup(zone, start, goal, start_temp, reached, best, _before(weather, start), last_from))
+        found.append(
+            Warmup(zone, start, goal, start_temp, reached, best, _before(weather, start), last_from, lowered)
+        )
     return found
 
 
-def usual_minutes(history: Sequence[Warmup], before: Warmup, days: int = 14, need: int = 5) -> float | None:
-    """Median last-degree minutes of the zone's completed warm-ups in the ``days`` before ``before``."""
+def usual_minutes(
+    history: Sequence[Warmup], before: Warmup, days: int = 14, need: int = 5, last: bool = True
+) -> float | None:
+    """Median minutes of the zone's completed warm-ups in the ``days`` before ``before``.
+
+    The last degree's minutes by default; with ``last=False``, the whole warm-up's.
+    """
     since = before.start - timedelta(days=days)
     times = [
-        w.last_minutes
+        m
         for w in history
-        if w.zone == before.zone and since <= w.start < before.start and w.last_minutes is not None
-    ]
+        if w.zone == before.zone and since <= w.start < before.start
+        and (m := w.last_minutes if last else w.minutes) is not None
+    ]  # fmt: skip
     return statistics.median(times) if len(times) >= need else None
 
 
-def is_slow(warmup: Warmup, usual: float | None, factor: float, min_extra: float) -> bool:
-    """Whether the last degree took ``factor`` times its usual and ``min_extra`` minutes more, or failed."""
-    if usual is None:
+def is_cut_short(warmup: Warmup, usual_total: float | None) -> bool:
+    """Whether the target was lowered before the room reached it, sooner than it usually takes."""
+    if warmup.lowered is None or usual_total is None:
+        return False
+    return (warmup.lowered - warmup.start).total_seconds() / 60 < usual_total
+
+
+def is_slow(
+    warmup: Warmup, usual: float | None, factor: float, min_extra: float, usual_total: float | None = None
+) -> bool:
+    """Whether the last degree took ``factor`` times its usual and ``min_extra`` minutes more, or failed.
+
+    A warm-up :func:`cut short <is_cut_short>` (given the zone's ``usual_total`` minutes) didn't fail.
+    """
+    if usual is None or is_cut_short(warmup, usual_total):
         return False
     if warmup.last_minutes is None:
         return True

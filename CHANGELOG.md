@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.17.0
+
+* `weekly-report` has a heating line: gas against what the weather predicted (from `usage-watch`),
+  how quickly rooms' last degree warmed up compared with the fortnight before, warm-ups that never
+  reached the target, the coldest day, and peak humidity / damp hours. New `weekly.json` fields
+  `gas_vs_weather`, `warmup_change`, `coldest` and `damp`.
+
 ## 0.16.1
 
 * `solar-forecast` rides out a short Forecast.Solar outage: if the request still fails after its

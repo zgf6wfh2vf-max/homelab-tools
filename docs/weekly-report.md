@@ -8,6 +8,7 @@ Bill £17.63 (electric £12.50, gas £7.33, export -£2.20) - £2.10 less than t
 Solar 38 kWh, battery supplied 42 kWh.
 Car 61 kWh, £3.40 (3 charges).
 92% of grid import off-peak; gas 160 kWh (20 kWh more than the week before); heating demand 12%, outside 9.8°C on average.
+Heating: gas 13% below what the weather predicted (6 days); rooms' last degree 5% quicker than the fortnight before; coldest day Thu, 2.1°C on average; humidity peaked at 64%, no damp spells.
 Systems: internet down twice (9 min in total); speed tests 142 Mbps down, up 31; powerline 1144-1331 Mbps; battery health 99%; server OK; last restore test passed (1 Nov 10:13).
 ```
 
@@ -19,6 +20,7 @@ Each line appears only when its data exists:
 | Solar, battery | `solis-monitor` |
 | Car | `podpoint-monitor` |
 | Off-peak, gas, heating | `octopus-collector`, `tado-monitor` |
+| Heating | [`usage-watch`](usage-watch.md) (gas against what the weather predicted, over the days it has modelled; each room's median last-degree warm-up time against its median in the two weeks before, and warm-ups that never reached the target) and [`tado-monitor`](tado.md) (coldest day by average outside temperature, peak humidity and hours at 70% or more, summed over rooms) |
 | Systems | Any of [`internet-monitor`](internet-monitor.md) (outages, median speed-test result), [`powerline-monitor`](powerline-monitor.md) (slowest and fastest link, as weekly averages), [`solar-health`](solar-health.md) (battery health), and the current [`host-health`](host-health.md) and [restore-test](restic-restore-test.md) results from `STATUS_DIR` |
 
 ## When to run it
@@ -43,4 +45,7 @@ weekly-report --week-ending 2026-10-25 # a specific week (ending on that Sunday)
 `gas_change` (e.g. `▼ £2.10`; "part week" when either week is missing days of data, "first week"
 when there is no previous week); and for the systems line `outages` (count and total length, or
 "none"), `broadband` (median download / upload) and `powerline` (weekly average of the slowest and
-fastest link).
+fastest link); and for the heating line `gas_vs_weather` (e.g. "-13%": gas used against what the
+weather predicted), `warmup_change` (e.g. "-5%": rooms' last-degree warm-up time against the
+fortnight before; negative is quicker), `coldest` (e.g. "Thu 2.1 °C") and `damp` (hours at 70%
+humidity or more, or "none").

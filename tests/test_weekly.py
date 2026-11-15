@@ -171,3 +171,57 @@ def test_systems_line(tmp_path) -> None:
     assert format_report(quiet, None)[1] == "Systems: no internet outages."
     assert display(quiet, None)["outages"] == "none"
     assert display(WeekFigures(date(2026, 10, 19)), None)["outages"] == "-"
+
+
+HEATING = {
+    "count_over_time(usage_gas_kwh": 6,
+    "sum_over_time(usage_gas_kwh": 261.0,
+    "usage_gas_expected_kwh": 300.0,
+    "heating_warmup_last_min": 0.95,
+    "heating_warmup_reached": 1,
+    "max(max_over_time(tado_humidity_pct": 71.6,
+    "tado_humidity_pct >= bool 70": 15,  # 10-minute steps: 2.5 hours
+}
+
+
+def test_heating_line_and_fields() -> None:
+    class ColdThursday(FakeVM):
+        def __call__(self, expr: str, at: float) -> float | None:
+            if expr.startswith("avg(avg_over_time(tado_weather_outside_c[86400s]"):
+                self.day = getattr(self, "day", -1) + 1
+                return [8.0, 7.5, 6.0, 2.06, 5.0, 9.0, 9.5][self.day]
+            return super().__call__(expr, at)
+
+    vm = ColdThursday(HEATING)
+    w = collect(vm, date(2026, 11, 9))
+    assert w.gas_model_days == 6
+    assert w.gas_vs_weather == pytest.approx(0.87) and w.damp_hours == pytest.approx(2.5)
+    _, message = format_report(w, None)
+    heating = next(line for line in message.splitlines() if line.startswith("Heating:"))
+    assert heating == (
+        "Heating: gas 13% below what the weather predicted (6 days); rooms' last degree 5% quicker than the "
+        "fortnight before; 1 warm-up never reached the target; coldest day Thu, 2.1°C on average; humidity "
+        "peaked at 72%, damp (70%+) for 2 h in total."
+    )
+    d = display(w, None)
+    assert (d["gas_vs_weather"], d["warmup_change"], d["coldest"], d["damp"]) == (
+        "-13%",
+        "-5%",
+        "Thu 2.1 °C",
+        "2 h",
+    )
+
+
+def test_heating_line_about_the_same_and_dry() -> None:
+    w = WeekFigures(
+        date(2026, 11, 9), gas_model_kwh=301.0, gas_expected_kwh=300.0, gas_model_days=7,
+        warmup_ratio=1.01, humidity_max=61.0, damp_hours=0.0,
+    )  # fmt: skip
+    from homelab_tools.report.weekly import heating_line
+
+    assert heating_line(w) == (
+        "Heating: gas about what the weather predicted; rooms' last degree about as quick as the fortnight "
+        "before; humidity peaked at 61%, no damp spells."
+    )
+    assert heating_line(WeekFigures(date(2026, 11, 9))) is None
+    assert display(w, None)["damp"] == "none" and display(WeekFigures(date(2026, 11, 9)), None)["damp"] == "-"

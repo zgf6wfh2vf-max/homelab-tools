@@ -6,7 +6,9 @@ optional and simply left out when its metrics are missing:
 * money - ``octopus-collector`` (import, export, gas, standing charges, off-peak share);
 * solar and battery - ``solis-monitor`` (daily counters ``solis_pv_today_kwh`` etc.);
 * car - ``podpoint-monitor`` (``ev_session_*``);
-* heating - ``tado-monitor`` (average heating demand and outside temperature);
+* heating - ``tado-monitor`` (average heating demand and outside temperature, the coldest day,
+  humidity and damp hours) and ``usage-watch`` (gas against what the weather predicted, and how
+  quickly rooms warmed up compared with the fortnight before);
 * systems - ``internet-monitor`` (outages, speeds), ``powerline-monitor`` (link speed),
   ``solar-health`` (battery state of health), plus the current ``host-health`` and restore-test
   results read from ``$STATUS_DIR``.
@@ -76,6 +78,15 @@ class WeekFigures:
     car_sessions: int = 0
     heating_pct: float | None = None
     outside_c: float | None = None
+    gas_model_kwh: float | None = None
+    gas_expected_kwh: float | None = None
+    gas_model_days: int = 0
+    coldest_day: date | None = None
+    coldest_c: float | None = None
+    warmup_ratio: float | None = None
+    warmups_missed: int = 0
+    humidity_max: float | None = None
+    damp_hours: float | None = None
     internet_checks: int = 0
     outages: int = 0
     outage_s: float = 0.0
@@ -114,6 +125,13 @@ class WeekFigures:
         if not self.offpeak_kwh and not self.peak_kwh:
             return None
         return (self.offpeak_kwh or 0.0) / ((self.offpeak_kwh or 0.0) + (self.peak_kwh or 0.0))
+
+    @property
+    def gas_vs_weather(self) -> float | None:
+        """Gas used as a fraction of what the weather predicted (``1.1`` = 10% more), if known."""
+        if not self.gas_model_kwh or not self.gas_expected_kwh:
+            return None
+        return self.gas_model_kwh / self.gas_expected_kwh
 
     @property
     def label(self) -> str:
@@ -183,7 +201,38 @@ def collect(query: Query, start: date) -> WeekFigures:
     w.powerline_min_mbps = query(f"min(avg_over_time(powerline_rate_mbps[{window}]))", at)
     w.powerline_max_mbps = query(f"max(avg_over_time(powerline_rate_mbps[{window}]))", at)
     w.battery_soh_pct = query(f"last_over_time(solis_soh[{window}])", at)
+    collect_heating(query, w, days, window, at)
     return w
+
+
+def collect_heating(query: Query, w: WeekFigures, days: list[date], window: str, at: float) -> None:
+    """Add the heating figures: gas against the weather, coldest day, warm-ups and humidity."""
+    # usage-watch's daily gas samples sit at the start of their day (local midnight), so look back
+    # from just before the week's end: that takes in Monday 00:00 but not the next Monday's.
+    before_end = at - 1
+    w.gas_model_days = int(query(f"sum(count_over_time(usage_gas_kwh[{window}]))", before_end) or 0)
+    if w.gas_model_days:
+        w.gas_model_kwh = query(f"sum(sum_over_time(usage_gas_kwh[{window}]))", before_end)
+        w.gas_expected_kwh = query(f"sum(sum_over_time(usage_gas_expected_kwh[{window}]))", before_end)
+    for day in days:
+        span, end = day_window(day)
+        mean = query(f"avg(avg_over_time(tado_weather_outside_c[{span}]))", end)
+        if mean is not None and (w.coldest_c is None or mean < w.coldest_c):
+            w.coldest_day, w.coldest_c = day, mean
+    # each zone's median last-degree time this week over its median in the two weeks before
+    w.warmup_ratio = query(
+        f"avg(quantile_over_time(0.5, heating_warmup_last_min[{window}]) "
+        f"/ quantile_over_time(0.5, heating_warmup_last_min[14d] offset {window}))",
+        at,
+    )
+    # heating_warmup_reached is 1/0 per warm-up: the count minus the sum is the ones not reached
+    reached = f"heating_warmup_reached[{window}]"
+    w.warmups_missed = round(query(f"sum(count_over_time({reached}) - sum_over_time({reached}))", at) or 0)
+    w.humidity_max = query(f"max(max_over_time(tado_humidity_pct[{window}]))", at)
+    if w.humidity_max is not None:
+        w.damp_hours = (
+            query(f"sum(sum_over_time((tado_humidity_pct >= bool 70)[{window}:10m]))", at) or 0
+        ) / 6
 
 
 def read_status_files(w: WeekFigures, status_dir: str) -> None:
@@ -238,6 +287,39 @@ def systems_line(w: WeekFigures) -> str | None:
     if w.restore_test:
         parts.append(f"last restore test {w.restore_test}")
     return "Systems: " + "; ".join(parts) + "." if parts else None
+
+
+def _percent(ratio: float, more: str, less: str, same: str, than: str) -> str:
+    """``1.13`` -> ``"13% <more> <than>"``; within 3% of 1, ``"<same>"``."""
+    if abs(ratio - 1) < 0.03:
+        return same
+    return f"{abs(ratio - 1) * 100:.0f}% {more if ratio > 1 else less} {than}"
+
+
+def heating_line(w: WeekFigures) -> str | None:
+    """``"Heating: gas 13% below what the weather predicted; ..."``, or ``None`` with nothing to say."""
+    parts = []
+    if (ratio := w.gas_vs_weather) is not None:
+        days = f" ({w.gas_model_days} days)" if w.gas_model_days < 7 else ""
+        predicted = "what the weather predicted"
+        parts.append("gas " + _percent(ratio, "above", "below", f"about {predicted}", predicted) + days)
+    if w.warmup_ratio is not None:
+        before = "the fortnight before"
+        speed = _percent(w.warmup_ratio, "slower", "quicker", f"about as quick as {before}", f"than {before}")
+        parts.append(f"rooms' last degree {speed}")
+    if w.warmups_missed:
+        plural = "s" if w.warmups_missed != 1 else ""
+        parts.append(f"{w.warmups_missed} warm-up{plural} never reached the target")
+    if w.coldest_day is not None and w.coldest_c is not None:
+        parts.append(f"coldest day {w.coldest_day:%a}, {w.coldest_c:.1f}°C on average")
+    if w.humidity_max is not None:
+        damp = (
+            f"damp (70%+) for {w.damp_hours:.0f} h in total"
+            if w.damp_hours and w.damp_hours >= 0.5
+            else "no damp spells"
+        )
+        parts.append(f"humidity peaked at {w.humidity_max:.0f}%, {damp}")
+    return "Heating: " + "; ".join(parts) + "." if parts else None
 
 
 def _pounds(pence: float) -> str:
@@ -296,6 +378,9 @@ def format_report(w: WeekFigures, prev: WeekFigures | None) -> tuple[str, str]:
         usage.append(f"heating demand {w.heating_pct:.0f}%{outside}")
     if usage:
         lines.append(usage[0][0].upper() + "; ".join(usage)[1:] + ".")
+    heating = heating_line(w)
+    if heating:
+        lines.append(heating)
     systems = systems_line(w)
     if systems:
         lines.append(systems)
@@ -350,6 +435,16 @@ def display(w: WeekFigures, prev: WeekFigures | None) -> dict[str, str]:
         "powerline": f"{w.powerline_min_mbps:.0f}-{w.powerline_max_mbps:.0f} Mbps"
         if w.powerline_min_mbps is not None and w.powerline_max_mbps is not None
         else "-",
+        "gas_vs_weather": f"{(w.gas_vs_weather - 1) * 100:+.0f}%" if w.gas_vs_weather is not None else "-",
+        "warmup_change": f"{(w.warmup_ratio - 1) * 100:+.0f}%" if w.warmup_ratio is not None else "-",
+        "coldest": f"{w.coldest_day:%a} {w.coldest_c:.1f} °C"
+        if w.coldest_day is not None and w.coldest_c is not None
+        else "-",
+        "damp": "-"
+        if w.humidity_max is None
+        else f"{w.damp_hours:.0f} h"
+        if w.damp_hours and w.damp_hours >= 0.5
+        else "none",
     }
 
 

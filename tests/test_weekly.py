@@ -212,6 +212,26 @@ def test_heating_line_and_fields() -> None:
     )
 
 
+def test_heating_line_per_room() -> None:
+    queries: list[str] = []
+
+    def by_zone(expr: str, at: float) -> dict[str, float]:
+        queries.append(expr)
+        return {"Upstairs": 0.98, "Downstairs": 1.4}
+
+    w = collect(FakeVM(HEATING), date(2026, 11, 9), by_zone)
+    assert list(w.warmup_zone_ratio) == ["Downstairs", "Upstairs"]
+    assert w.warmup_ratio == pytest.approx(1.19)
+    assert queries == [q for q in queries if "heating_warmup_last_min[14d] offset" in q] and len(queries) == 1
+    heating = next(line for line in format_report(w, None)[1].splitlines() if line.startswith("Heating:"))
+    rooms = "last degree against the fortnight before: Downstairs 40% slower, Upstairs about the same"
+    assert f"; {rooms};" in heating
+    assert display(w, None)["warmup_change"] == "Downstairs +40%, Upstairs -2%"
+    one = collect(FakeVM(HEATING), date(2026, 11, 9), lambda expr, at: {"Upstairs": 0.9})
+    assert "rooms' last degree 10% quicker than the fortnight before" in format_report(one, None)[1]
+    assert display(one, None)["warmup_change"] == "-10%"
+
+
 def test_warmups_cut_short_are_not_counted_as_missed() -> None:
     w = collect(FakeVM(HEATING | {"heating_warmup_cut_short": 1}), date(2026, 11, 9))
     assert w.warmups_missed == 0

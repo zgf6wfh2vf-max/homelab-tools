@@ -50,11 +50,15 @@ the room is at least 1 °C below the new target, usage-watch measures how long t
 within 0.1 °C of it.
 
 ```
-Slow to warm up: Upstairs
-Upstairs took 4h 20m to reach 21.5 °C from 20.0 °C after Fri 06:00 (usually 2h 30m), with 1.5 °C
-outside. If this keeps happening as it gets colder, the boiler's flow temperature or weather curve
-may be too low, or a radiator valve may be stuck.
+Slow to warm up: Downstairs
+Downstairs took 4h 47m to reach 21.5 °C from 18.8 °C after Sat 07:00, with 2.2 °C outside. The last
+degree took 2h 50m (usually 1h 00m). Upstairs warmed up normally, so this points to Downstairs
+itself - a door or window left open, or a radiator valve sticking - rather than the boiler.
 ```
+
+The alert compares the other zones' warm-ups that started within half an hour: if they were
+normal, the slow room is the likely cause; if they were all slow too, the boiler's flow temperature
+or weather curve probably is. With one zone (or the others still warming up) it says either could be.
 
 A warm-up is reported when its **last degree** (from 1 °C short of the target until the room
 reaches it) takes `WARMUP_FACTOR` (1.5×) the zone's usual (the median of its warm-ups over the

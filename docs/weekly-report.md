@@ -20,7 +20,7 @@ Each line appears only when its data exists:
 | Solar, battery | `solis-monitor` |
 | Car | `podpoint-monitor` |
 | Off-peak, gas, heating | `octopus-collector`, `tado-monitor` |
-| Heating | [`usage-watch`](usage-watch.md) (gas against what the weather predicted, over the days it has modelled; each room's median last-degree warm-up time against its median in the two weeks before, and warm-ups that never reached the target, not counting those cut short) and [`tado-monitor`](tado.md) (coldest day by average outside temperature, peak humidity and hours at 70% or more, summed over rooms) |
+| Heating | [`usage-watch`](usage-watch.md) (gas against what the weather predicted, over the days it has modelled; each room's median last-degree warm-up time against its median in the two weeks before, room by room, and warm-ups that never reached the target, not counting those cut short) and [`tado-monitor`](tado.md) (coldest day by average outside temperature, peak humidity and hours at 70% or more, summed over rooms) |
 | Systems | Any of [`internet-monitor`](internet-monitor.md) (outages, median speed-test result), [`powerline-monitor`](powerline-monitor.md) (slowest and fastest link, as weekly averages), [`solar-health`](solar-health.md) (battery health), and the current [`host-health`](host-health.md) and [restore-test](restic-restore-test.md) results from `STATUS_DIR` |
 
 ## When to run it
@@ -46,6 +46,7 @@ weekly-report --week-ending 2026-10-25 # a specific week (ending on that Sunday)
 when there is no previous week); and for the systems line `outages` (count and total length, or
 "none"), `broadband` (median download / upload) and `powerline` (weekly average of the slowest and
 fastest link); and for the heating line `gas_vs_weather` (e.g. "-13%": gas used against what the
-weather predicted), `warmup_change` (e.g. "-5%": rooms' last-degree warm-up time against the
-fortnight before; negative is quicker), `coldest` (e.g. "Thu 2.1 °C") and `damp` (hours at 70%
+weather predicted), `warmup_change` (e.g. "Downstairs +40%, Upstairs -2%", or "-5%" with one
+zone: each room's median last-degree warm-up time against the fortnight before; negative is
+quicker), `coldest` (e.g. "Thu 2.1 °C") and `damp` (hours at 70%
 humidity or more, or "none").

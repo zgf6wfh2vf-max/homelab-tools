@@ -27,12 +27,13 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import statistics
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from homelab_tools.common.config import Outputs, env_str
-from homelab_tools.common.metrics import Query, vm_query
+from homelab_tools.common.metrics import Query, QueryBy, vm_query, vm_query_by
 from homelab_tools.common.notify import Notifier
 from homelab_tools.common.status import write_status
 
@@ -84,6 +85,7 @@ class WeekFigures:
     coldest_day: date | None = None
     coldest_c: float | None = None
     warmup_ratio: float | None = None
+    warmup_zone_ratio: dict[str, float] = field(default_factory=dict)
     warmups_missed: int = 0
     humidity_max: float | None = None
     damp_hours: float | None = None
@@ -147,8 +149,11 @@ def day_window(day: date) -> tuple[str, float]:
     return f"{int((end - start).total_seconds())}s", end.timestamp()
 
 
-def collect(query: Query, start: date) -> WeekFigures:
-    """Gather the week starting on ``start`` (a Monday) from the time-series database."""
+def collect(query: Query, start: date, by_zone: QueryBy | None = None) -> WeekFigures:
+    """Gather the week starting on ``start`` (a Monday) from the time-series database.
+
+    ``by_zone`` (a query keyed by the ``zone`` label) adds each heating zone's warm-up change.
+    """
     days = [start + timedelta(days=i) for i in range(7)]
     t_start, t_end = local_midnight(start), local_midnight(start + timedelta(days=7))
     window = f"{int((t_end - t_start).total_seconds())}s"  # 167 h or 169 h in clock-change weeks
@@ -201,11 +206,13 @@ def collect(query: Query, start: date) -> WeekFigures:
     w.powerline_min_mbps = query(f"min(avg_over_time(powerline_rate_mbps[{window}]))", at)
     w.powerline_max_mbps = query(f"max(avg_over_time(powerline_rate_mbps[{window}]))", at)
     w.battery_soh_pct = query(f"last_over_time(solis_soh[{window}])", at)
-    collect_heating(query, w, days, window, at)
+    collect_heating(query, w, days, window, at, by_zone)
     return w
 
 
-def collect_heating(query: Query, w: WeekFigures, days: list[date], window: str, at: float) -> None:
+def collect_heating(
+    query: Query, w: WeekFigures, days: list[date], window: str, at: float, by_zone: QueryBy | None = None
+) -> None:
     """Add the heating figures: gas against the weather, coldest day, warm-ups and humidity."""
     # usage-watch's daily gas samples sit at the start of their day (local midnight), so look back
     # from just before the week's end: that takes in Monday 00:00 but not the next Monday's.
@@ -220,11 +227,16 @@ def collect_heating(query: Query, w: WeekFigures, days: list[date], window: str,
         if mean is not None and (w.coldest_c is None or mean < w.coldest_c):
             w.coldest_day, w.coldest_c = day, mean
     # each zone's median last-degree time this week over its median in the two weeks before
-    w.warmup_ratio = query(
-        f"avg(quantile_over_time(0.5, heating_warmup_last_min[{window}]) "
-        f"/ quantile_over_time(0.5, heating_warmup_last_min[14d] offset {window}))",
-        at,
+    ratio = (
+        f"quantile_over_time(0.5, heating_warmup_last_min[{window}]) "
+        f"/ quantile_over_time(0.5, heating_warmup_last_min[14d] offset {window})"
     )
+    if by_zone is not None:
+        w.warmup_zone_ratio = dict(sorted(by_zone(ratio, at).items()))
+    if w.warmup_zone_ratio:
+        w.warmup_ratio = statistics.fmean(w.warmup_zone_ratio.values())
+    else:
+        w.warmup_ratio = query(f"avg({ratio})", at)
     # heating_warmup_reached is 1/0 per warm-up: the count minus the sum is the ones not reached,
     # less those cut short (target lowered early, e.g. Away mode)
     reached = f"heating_warmup_reached[{window}]"
@@ -299,6 +311,13 @@ def _percent(ratio: float, more: str, less: str, same: str, than: str) -> str:
     return f"{abs(ratio - 1) * 100:.0f}% {more if ratio > 1 else less} {than}"
 
 
+def _warmup_change(w: WeekFigures) -> str:
+    """``"Downstairs +40%, Upstairs -3%"`` with several zones, else e.g. ``"-5%"``; ``"-"`` if unknown."""
+    if len(w.warmup_zone_ratio) > 1:
+        return ", ".join(f"{zone} {(r - 1) * 100:+.0f}%" for zone, r in w.warmup_zone_ratio.items())
+    return f"{(w.warmup_ratio - 1) * 100:+.0f}%" if w.warmup_ratio is not None else "-"
+
+
 def heating_line(w: WeekFigures) -> str | None:
     """``"Heating: gas 13% below what the weather predicted; ..."``, or ``None`` with nothing to say."""
     parts = []
@@ -306,8 +325,14 @@ def heating_line(w: WeekFigures) -> str | None:
         days = f" ({w.gas_model_days} days)" if w.gas_model_days < 7 else ""
         predicted = "what the weather predicted"
         parts.append("gas " + _percent(ratio, "above", "below", f"about {predicted}", predicted) + days)
-    if w.warmup_ratio is not None:
-        before = "the fortnight before"
+    before = "the fortnight before"
+    if len(w.warmup_zone_ratio) > 1:
+        rooms = ", ".join(
+            f"{zone} " + _percent(r, "slower", "quicker", "about the same", "").rstrip()
+            for zone, r in w.warmup_zone_ratio.items()
+        )
+        parts.append(f"last degree against {before}: {rooms}")
+    elif w.warmup_ratio is not None:
         speed = _percent(w.warmup_ratio, "slower", "quicker", f"about as quick as {before}", f"than {before}")
         parts.append(f"rooms' last degree {speed}")
     if w.warmups_missed:
@@ -439,7 +464,7 @@ def display(w: WeekFigures, prev: WeekFigures | None) -> dict[str, str]:
         if w.powerline_min_mbps is not None and w.powerline_max_mbps is not None
         else "-",
         "gas_vs_weather": f"{(w.gas_vs_weather - 1) * 100:+.0f}%" if w.gas_vs_weather is not None else "-",
-        "warmup_change": f"{(w.warmup_ratio - 1) * 100:+.0f}%" if w.warmup_ratio is not None else "-",
+        "warmup_change": _warmup_change(w),
         "coldest": f"{w.coldest_day:%a} {w.coldest_c:.1f} °C"
         if w.coldest_day is not None and w.coldest_c is not None
         else "-",
@@ -461,13 +486,14 @@ def main() -> None:
 
     outputs = Outputs.from_env()
     query = vm_query(env_str("VM_URL"))
+    by_zone = vm_query_by(env_str("VM_URL"), "zone")
     if args.week_ending:
         start = args.week_ending - timedelta(days=6)
     else:
         start, _ = last_complete_week(datetime.now().astimezone().date())
-    this_week = collect(query, start)
+    this_week = collect(query, start, by_zone)
     read_status_files(this_week, outputs.status_dir)
-    prev_week = collect(query, start - timedelta(days=7))
+    prev_week = collect(query, start - timedelta(days=7), by_zone)
     title, message = format_report(this_week, prev_week)
     if args.dry_run:
         print(f"{title}\n{message}")

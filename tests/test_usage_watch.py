@@ -17,6 +17,7 @@ from homelab_tools.usage.watch import (
     daily_temperatures,
     daily_totals,
     gas_samples,
+    warmup_alert,
 )
 
 
@@ -249,3 +250,49 @@ def test_watch_warmups_learn_quietly_first_then_alert_on_a_slow_morning() -> Non
     assert alerts == []
     assert status["warmup_upstairs"].startswith("cut short (target lowered Sat ")
     assert written[-1].fields["warmup_cut_short"] is True and written[-1].fields["warmup_reached"] is False
+
+
+def test_watch_warmup_alert_says_whether_other_rooms_were_slow_too() -> None:
+    from test_usage_warmup import morning
+
+    inside: dict = {"Upstairs": {}, "Downstairs": {}}
+    target: dict = {"Upstairs": {}, "Downstairs": {}}
+    for day in range(8):
+        for zone in inside:
+            i, t = morning(day, 150)
+            inside[zone] |= i
+            target[zone] |= t
+    zones = {"tado_inside_c": inside, "tado_target_c": target}
+    state = State(gas_checked="2099-01-01")
+
+    def watch() -> Watch:
+        w = make_watch({}, {}, [], state)
+        w.zones = lambda metric, start, end: zones.get(metric, {})
+        return w
+
+    watch().run(datetime(2026, 11, 20, 10, tzinfo=UTC))  # learn
+    # Friday: only Downstairs is slow
+    for zone, minutes in (("Downstairs", 260), ("Upstairs", 150)):
+        i, t = morning(8, minutes)
+        inside[zone] |= i
+        target[zone] |= t
+    alerts, _ = watch().run(datetime(2026, 11, 21, 10, tzinfo=UTC))
+    assert [a[0] for a in alerts] == ["Slow to warm up: Downstairs"]
+    assert "Upstairs warmed up normally, so this points to Downstairs itself" in alerts[0][1]
+    # Saturday: both are slow
+    for zone in inside:
+        i, t = morning(9, 260)
+        inside[zone] |= i
+        target[zone] |= t
+    alerts, _ = watch().run(datetime(2026, 11, 22, 10, tzinfo=UTC))
+    assert sorted(a[0] for a in alerts) == ["Slow to warm up: Downstairs", "Slow to warm up: Upstairs"]
+    assert all("slow too, so the boiler's flow temperature" in a[1] for a in alerts)
+    assert "Upstairs was slow too" in next(a[1] for a in alerts if a[0].endswith("Downstairs"))
+
+
+def test_warmup_alert_names_several_rooms() -> None:
+    from homelab_tools.usage.warmup import Warmup
+
+    w = Warmup("Hall", datetime(2026, 11, 21, 6, tzinfo=UTC), 21.5, 20.0, None, 20.6, None)
+    text = warmup_alert(w, 60, slow=["Bedroom", "Kitchen", "Lounge"])[1]
+    assert "Bedroom, Kitchen and Lounge were slow too" in text

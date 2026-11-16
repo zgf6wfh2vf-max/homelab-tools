@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.1
+
+* `usage-watch`: a "Slow to warm up" alert says whether the other rooms warmed up normally that
+  morning (pointing to the slow room itself: a door left open, a sticking radiator valve) or were
+  slow too (pointing to the boiler's flow temperature or weather curve).
+* `weekly-report`: the heating line gives each room's last-degree change separately ("Downstairs
+  40% slower, Upstairs about the same"), so one slow room no longer hides in an average;
+  `warmup_change` likewise.
+
 ## 0.17.0
 
 * `weekly-report` has a heating line: gas against what the weather predicted (from `usage-watch`),

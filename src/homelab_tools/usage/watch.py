@@ -335,8 +335,12 @@ def gas_alert(c: GasCheck) -> Alert:
     )
 
 
-def warmup_alert(w: Warmup, usual: float) -> Alert:
-    """A warm-up that was much slower than usual, or never reached its target."""
+def warmup_alert(w: Warmup, usual: float, normal: Sequence[str] = (), slow: Sequence[str] = ()) -> Alert:
+    """A warm-up that was much slower than usual, or never reached its target.
+
+    ``normal`` and ``slow`` name the other zones whose warm-up that same morning was normal or slow
+    too: one slow room points to the room itself, all of them to the boiler.
+    """
     start = w.start.astimezone()
     outside = f", with {w.outside:.1f} °C outside" if w.outside is not None else ""
     if w.minutes is None:
@@ -351,12 +355,27 @@ def warmup_alert(w: Warmup, usual: float) -> Alert:
             f"after {start:%a %H:%M}{outside}. The last degree took {duration(w.last_minutes or 0)} "
             f"(usually {duration(usual)})."
         )
-    return (
-        f"Slow to warm up: {w.zone}",
-        what + " If this keeps happening as it gets colder, the boiler's flow temperature or weather "
-        "curve may be too low, or a radiator valve may be stuck.",
-        "default",
-    )
+    if slow and not normal:
+        why = (
+            f" {_names(slow)} {'was' if len(slow) == 1 else 'were'} slow too, so the boiler's flow "
+            "temperature or weather curve is probably too low for the weather."
+        )
+    elif normal:
+        why = (
+            f" {_names(normal)} warmed up normally, so this points to {w.zone} itself - a door or window "
+            "left open, or a radiator valve sticking - rather than the boiler."
+        )
+    else:
+        why = (
+            " If this keeps happening as it gets colder, the boiler's flow temperature or weather "
+            "curve may be too low, or a radiator valve may be stuck."
+        )
+    return (f"Slow to warm up: {w.zone}", what + why, "default")
+
+
+def _names(zones: Sequence[str]) -> str:
+    """``["A", "B", "C"]`` -> ``"A, B and C"``."""
+    return " and ".join([", ".join(zones[:-1]), zones[-1]]) if len(zones) > 1 else zones[0]
 
 
 def baseload_alert(c: BaseloadCheck, recovered: bool) -> Alert:
@@ -490,6 +509,13 @@ class Watch:
         self.state.warmup_checked = warmups[-1].start.isoformat()
         if first_run:
             return []  # don't replay old history
+        slow = {
+            w
+            for w in warmups
+            if w not in cut
+            and (u := usual_minutes(warmups, w)) is not None
+            and is_slow(w, u, self.warmup_factor, self.warmup_min_extra)
+        }
         alerts = []
         for w in new:
             typical = usual_minutes(warmups, w)
@@ -502,8 +528,16 @@ class Watch:
             )  # fmt: skip
             if w in cut or typical is None:
                 continue
-            if is_slow(w, typical, self.warmup_factor, self.warmup_min_extra):
-                alerts.append(warmup_alert(w, typical))
+            if w in slow:
+                # the other zones' warm-ups that started within half an hour, judged the same way
+                same_morning = [
+                    o for o in warmups
+                    if o.zone != w.zone and o not in cut and abs(o.start - w.start) <= timedelta(minutes=30)
+                    and usual_minutes(warmups, o) is not None
+                ]  # fmt: skip
+                normal = sorted({o.zone for o in same_morning if o not in slow})
+                also_slow = sorted({o.zone for o in same_morning if o in slow} - set(normal))
+                alerts.append(warmup_alert(w, typical, normal, also_slow))
         return alerts
 
     def _baseload(self, now: datetime, status: dict[str, str]) -> list[Alert]:

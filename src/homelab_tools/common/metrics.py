@@ -34,6 +34,8 @@ Query = Callable[[str, float], float | None]
 #: Evaluates a MetricsQL expression from ``start`` to ``end`` every ``step`` seconds; returns the
 #: first series as ``(epoch seconds, value)`` pairs (empty if there is no data).
 RangeQuery = Callable[[str, float, float, int], list[tuple[float, float]]]
+#: ``(expr, at) -> {label value: value}``: an instant query with one value per series, keyed by a label.
+QueryBy = Callable[[str, float], dict[str, float]]
 FieldValue = float | int | bool
 
 
@@ -151,6 +153,17 @@ def vm_query(vm_url: str) -> Query:
         params = urllib.parse.urlencode({"query": expr, "time": int(at)})
         result = _get_json(f"{vm_url}/api/v1/query?{params}")["data"]["result"]  # type: ignore[index]
         return float(result[0]["value"][1]) if result else None
+
+    return query
+
+
+def vm_query_by(vm_url: str, label: str) -> QueryBy:
+    """A :data:`QueryBy` backed by VictoriaMetrics' instant-query API, keyed by ``label``."""
+
+    def query(expr: str, at: float) -> dict[str, float]:
+        params = urllib.parse.urlencode({"query": expr, "time": int(at)})
+        result = _get_json(f"{vm_url}/api/v1/query?{params}")["data"]["result"]  # type: ignore[index]
+        return {row["metric"].get(label, ""): float(row["value"][1]) for row in result}
 
     return query
 

@@ -227,6 +227,8 @@ def test_heating_line_per_room() -> None:
     rooms = "last degree against the fortnight before: Downstairs 40% slower, Upstairs about the same"
     assert f"; {rooms};" in heating
     assert display(w, None)["warmup_change"] == "Downstairs +40%, Upstairs -2%"
+    level = collect(FakeVM(HEATING), date(2026, 11, 9), lambda expr, at: {"Up": 0.996, "Down": 1.004})
+    assert display(level, None)["warmup_change"] == "Down 0%, Up 0%"  # not "-0%"
     one = collect(FakeVM(HEATING), date(2026, 11, 9), lambda expr, at: {"Upstairs": 0.9})
     assert "rooms' last degree 10% quicker than the fortnight before" in format_report(one, None)[1]
     assert display(one, None)["warmup_change"] == "-10%"

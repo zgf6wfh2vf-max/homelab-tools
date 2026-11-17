@@ -311,11 +311,17 @@ def _percent(ratio: float, more: str, less: str, same: str, than: str) -> str:
     return f"{abs(ratio - 1) * 100:.0f}% {more if ratio > 1 else less} {than}"
 
 
+def _signed_pct(ratio: float) -> str:
+    """``1.13`` -> ``"+13%"``, ``0.95`` -> ``"-5%"``; under half a percent either way, ``"0%"``."""
+    pct = round((ratio - 1) * 100)
+    return f"{pct:+d}%" if pct else "0%"
+
+
 def _warmup_change(w: WeekFigures) -> str:
     """``"Downstairs +40%, Upstairs -3%"`` with several zones, else e.g. ``"-5%"``; ``"-"`` if unknown."""
     if len(w.warmup_zone_ratio) > 1:
-        return ", ".join(f"{zone} {(r - 1) * 100:+.0f}%" for zone, r in w.warmup_zone_ratio.items())
-    return f"{(w.warmup_ratio - 1) * 100:+.0f}%" if w.warmup_ratio is not None else "-"
+        return ", ".join(f"{zone} {_signed_pct(r)}" for zone, r in w.warmup_zone_ratio.items())
+    return _signed_pct(w.warmup_ratio) if w.warmup_ratio is not None else "-"
 
 
 def heating_line(w: WeekFigures) -> str | None:
@@ -463,7 +469,7 @@ def display(w: WeekFigures, prev: WeekFigures | None) -> dict[str, str]:
         "powerline": f"{w.powerline_min_mbps:.0f}-{w.powerline_max_mbps:.0f} Mbps"
         if w.powerline_min_mbps is not None and w.powerline_max_mbps is not None
         else "-",
-        "gas_vs_weather": f"{(w.gas_vs_weather - 1) * 100:+.0f}%" if w.gas_vs_weather is not None else "-",
+        "gas_vs_weather": _signed_pct(w.gas_vs_weather) if w.gas_vs_weather is not None else "-",
         "warmup_change": _warmup_change(w),
         "coldest": f"{w.coldest_day:%a} {w.coldest_c:.1f} °C"
         if w.coldest_day is not None and w.coldest_c is not None

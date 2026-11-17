@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.17.2
+
+* `weekly-report`: a change under half a percent shows as "0%" in `weekly.json`, not "-0%".
+
 ## 0.17.1
 
 * `usage-watch`: a "Slow to warm up" alert says whether the other rooms warmed up normally that
